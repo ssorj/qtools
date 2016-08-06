@@ -23,15 +23,21 @@ clean:
 
 .PHONY: build
 build:
+	scripts/configure-file bin/qbroker.in build/bin/qbroker quiver_home ${QUIVER_HOME}
+	scripts/configure-file bin/qsend.in build/bin/qsend quiver_home ${QUIVER_HOME}
+	scripts/configure-file bin/qreceive.in build/bin/qreceive quiver_home ${QUIVER_HOME}
 	scripts/configure-file bin/qexec.in build/bin/qexec quiver_home ${QUIVER_HOME}
 
 .PHONY: install
 install: build
-	scripts/install-files python ${DESTDIR}${PREFIX}${QUIVER_HOME}/python \*.py
+	scripts/install-files python ${DESTDIR}${QUIVER_HOME}/python \*.py
+	scripts/install-executable build/bin/qbroker ${DESTDIR}${PREFIX}/bin/qbroker
+	scripts/install-executable build/bin/qsend ${DESTDIR}${PREFIX}/bin/qsend
+	scripts/install-executable build/bin/qreceive ${DESTDIR}${PREFIX}/bin/qreceive
 	scripts/install-executable build/bin/qexec ${DESTDIR}${PREFIX}/bin/qexec
 
 .PHONY: devel
 devel: PREFIX := ${PWD}/install
 devel: clean install
-	which qexec
+	qbroker --help
 	qexec --help

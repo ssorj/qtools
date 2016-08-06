@@ -29,11 +29,11 @@ sys.path.insert(0, os.path.join(quiver_home, "python"))
 from argparse import ArgumentParser
 
 def main():
-    description = "Run commands when messages are received"
+    description = "Send AMQP messages"
     parser = ArgumentParser(description=description)
 
     parser.add_argument("address", metavar="ADDRESS")
-    parser.add_argument("command", metavar="COMMAND")
+    parser.add_argument("message", metavar="MESSAGE")
     parser.add_argument("--init-only", action="store_true")
 
     args = parser.parse_args()

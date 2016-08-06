@@ -27,19 +27,31 @@ quiver_home = os.environ.get("QUIVER_HOME", default_quiver_home)
 sys.path.insert(0, os.path.join(quiver_home, "python"))
 
 from argparse import ArgumentParser
+from spindle import *
+from broker import *
 
 def main():
-    description = "Run commands when messages are received"
+    set_thread_name("qbroker")
+    add_logged_module("quiver")
+    enable_console_logging("info")
+    
+    description = "A simple AMQP message broker for testing"
     parser = ArgumentParser(description=description)
 
-    parser.add_argument("address", metavar="ADDRESS")
-    parser.add_argument("command", metavar="COMMAND")
-    parser.add_argument("--init-only", action="store_true")
+    parser.add_argument("--host", metavar="HOST", default="localhost",
+                        help="Listen at HOST (default localhost)")
+    parser.add_argument("--port", metavar="PORT", default="5672",
+                        help="Listen at PORT (default 5672)")
+    parser.add_argument("--verbose", action="store_true",
+                        help="Even more logging than usual")
 
     args = parser.parse_args()
 
-    if args.init_only:
-        return
+    interface = "{}:{}".format(args.host, args.port)
+    
+    broker = Broker(interface)
+
+    broker.run()
 
 if __name__ == "__main__":
     try:
