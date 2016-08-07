@@ -27,19 +27,31 @@ quiver_home = os.environ.get("QUIVER_HOME", default_quiver_home)
 sys.path.insert(0, os.path.join(quiver_home, "python"))
 
 from argparse import ArgumentParser
+from quiver import *
 
 def main():
     description = "Receive AMQP messages"
     parser = ArgumentParser(description=description)
 
     parser.add_argument("address", metavar="ADDRESS")
-    parser.add_argument("count", metavar="COUNT")
+    parser.add_argument("max_count", metavar="MAX-COUNT",
+                        nargs="?", type=int, default=1)
     parser.add_argument("--init-only", action="store_true")
 
     args = parser.parse_args()
 
     if args.init_only:
         return
+
+    address = args.address
+
+    if "/" not in address:
+        address = "localhost:5672/{}".format(address)
+    
+    handler = ReceiveHandler(address, args.max_count)
+    container = Container(handler, sasl_enabled=False)
+
+    container.run()
 
 if __name__ == "__main__":
     try:

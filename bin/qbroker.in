@@ -28,7 +28,7 @@ sys.path.insert(0, os.path.join(quiver_home, "python"))
 
 from argparse import ArgumentParser
 from spindle import *
-from broker import *
+from quiver import *
 
 def main():
     set_thread_name("qbroker")
