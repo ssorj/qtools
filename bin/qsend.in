@@ -21,13 +21,13 @@
 import os
 import sys
 
-default_quiver_home = os.path.normpath("@quiver_home@")
-quiver_home = os.environ.get("QUIVER_HOME", default_quiver_home)
+default_qtools_home = os.path.normpath("@qtools_home@")
+qtools_home = os.environ.get("QTOOLS_HOME", default_qtools_home)
 
-sys.path.insert(0, os.path.join(quiver_home, "python"))
+sys.path.insert(0, os.path.join(qtools_home, "python"))
 
 from argparse import ArgumentParser
-from quiver import *
+from qtools import *
 
 def main():
     description = "Send AMQP messages"

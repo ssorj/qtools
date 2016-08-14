@@ -26,7 +26,7 @@ from proton import *
 from proton.handlers import *
 from proton.reactor import *
 
-_log = _logging.getLogger("quiver")
+_log = _logging.getLogger("qtools")
 
 class SendHandler(MessagingHandler):
     def __init__(self, address, message_body):
@@ -62,10 +62,11 @@ class SendHandler(MessagingHandler):
         event.sender.send(message)
 
         print("SENDER: Sent message '{0}'".format(self.message_body))
-        
-        event.connection.close()
 
         self.sent = True
+        
+    def on_accepted(self, event):
+        event.connection.close()
 
 class ReceiveHandler(MessagingHandler):
     def __init__(self, address, max_count):
