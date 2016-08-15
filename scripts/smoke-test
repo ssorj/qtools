@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/bash
 #
 # Licensed to the Apache Software Foundation (ASF) under one
 # or more contributor license agreements.  See the NOTICE file
@@ -17,28 +17,27 @@
 # specific language governing permissions and limitations
 # under the License.
 #
+# -*- mode: sh; -*-
 
-import os
-import sys
+set -e
 
-default_qtools_home = os.path.normpath("@qtools_home@")
-qtools_home = os.environ.get("QTOOLS_HOME", default_qtools_home)
+sent_message=$RANDOM
+address=localhost:56720/q0
 
-sys.path.insert(0, os.path.join(qtools_home, "python"))
+qbroker --port 56720 &
 
-from argparse import ArgumentParser
+broker_pid=$!
 
-def main():
-    description = "Run commands when messages are received"
-    parser = ArgumentParser(description=description)
+trap "kill $broker_pid" EXIT
 
-    parser.add_argument("address", metavar="ADDRESS")
-    parser.add_argument("command", metavar="COMMAND")
+sleep 0.2
 
-    args = parser.parse_args()
+qsend --verbose $address $sent_message
+received_message=$(qreceive $address)
 
-if __name__ == "__main__":
-    try:
-        main()
-    except KeyboardInterrupt:
-        pass
+echo "qreceive: Received message '$received_message'"
+
+if [[ $sent_message != $received_message ]]; then
+    echo "Failure!"
+    exit 1
+fi

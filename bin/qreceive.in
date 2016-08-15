@@ -1,4 +1,4 @@
-#!/usr/bin/python3
+#!/usr/bin/python
 #
 # Licensed to the Apache Software Foundation (ASF) under one
 # or more contributor license agreements.  See the NOTICE file
@@ -36,12 +36,9 @@ def main():
     parser.add_argument("address", metavar="ADDRESS")
     parser.add_argument("max_count", metavar="MAX-COUNT",
                         nargs="?", type=int, default=1)
-    parser.add_argument("--init-only", action="store_true")
+    parser.add_argument("--verbose", action="store_true")
 
     args = parser.parse_args()
-
-    if args.init_only:
-        return
 
     address = args.address
 
@@ -49,8 +46,9 @@ def main():
         address = "localhost:5672/{}".format(address)
     
     handler = ReceiveHandler(address, args.max_count)
-    container = Container(handler, sasl_enabled=False)
+    handler.verbose = args.verbose
 
+    container = Container(handler)
     container.run()
 
 if __name__ == "__main__":

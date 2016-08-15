@@ -17,6 +17,8 @@
 # under the License.
 #
 
+from __future__ import print_function
+
 import collections as _collections
 import logging as _logging
 import pencil as _pencil
@@ -30,12 +32,21 @@ _log = _logging.getLogger("qtools")
 
 class SendHandler(MessagingHandler):
     def __init__(self, address, message_body):
-        super().__init__()
+        super(SendHandler, self).__init__()
 
         self.address = address
         self.message_body = message_body
 
         self.sent = False
+        self.verbose = False
+
+    def print(self, message, *args):
+        if not self.verbose:
+            return
+
+        message = "qsend: {}".format(message)
+        
+        print(message.format(*args))
     
     def on_start(self, event):
         # XXX I have to parse the address here because for some reason
@@ -52,7 +63,7 @@ class SendHandler(MessagingHandler):
         
         event.container.create_sender(conn, url.path)
 
-        print("SENDER: Created sender for target address '{0}'".format(url.path))
+        self.print("Created sender for target address '{}'", url.path)
 
     def on_sendable(self, event):
         if self.sent:
@@ -61,7 +72,7 @@ class SendHandler(MessagingHandler):
         message = Message(self.message_body)
         event.sender.send(message)
 
-        print("SENDER: Sent message '{0}'".format(self.message_body))
+        self.print("Sent message '{}'", self.message_body)
 
         self.sent = True
         
@@ -70,12 +81,21 @@ class SendHandler(MessagingHandler):
 
 class ReceiveHandler(MessagingHandler):
     def __init__(self, address, max_count):
-        super().__init__()
+        super(ReceiveHandler, self).__init__()
 
         self.address = address
         self.max_count = max_count
 
         self.count = 0
+        self.verbose = False
+
+    def print(self, message, *args):
+        if not self.verbose:
+            return
+
+        message = "qreceive: {}".format(message)
+        
+        print(message.format(*args))
     
     def on_start(self, event):
         conn = event.container.connect(self.address, allowed_mechs="ANONYMOUS")
@@ -83,10 +103,15 @@ class ReceiveHandler(MessagingHandler):
         
         event.container.create_receiver(conn, url.path)
 
-        print("RECEIVER: Created receiver for source address '{0}'".format(url.path))
+        self.print("Created receiver for source address '{}'", url.path)
 
     def on_message(self, event):
-        print("RECEIVER: Received message '{0}'".format(event.message.body))
+        if self.count == self.max_count:
+            return
+        
+        self.print("Received message '{}'", event.message.body)
+
+        print(event.message.body)
 
         self.count += 1
 

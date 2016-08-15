@@ -26,7 +26,7 @@ build:
 	scripts/configure-file bin/qbroker.in build/bin/qbroker qtools_home ${QTOOLS_HOME}
 	scripts/configure-file bin/qsend.in build/bin/qsend qtools_home ${QTOOLS_HOME}
 	scripts/configure-file bin/qreceive.in build/bin/qreceive qtools_home ${QTOOLS_HOME}
-	scripts/configure-file bin/qexec.in build/bin/qexec qtools_home ${QTOOLS_HOME}
+#	scripts/configure-file bin/qexec.in build/bin/qexec qtools_home ${QTOOLS_HOME}
 
 .PHONY: install
 install: build
@@ -34,10 +34,9 @@ install: build
 	scripts/install-executable build/bin/qbroker ${DESTDIR}${PREFIX}/bin/qbroker
 	scripts/install-executable build/bin/qsend ${DESTDIR}${PREFIX}/bin/qsend
 	scripts/install-executable build/bin/qreceive ${DESTDIR}${PREFIX}/bin/qreceive
-	scripts/install-executable build/bin/qexec ${DESTDIR}${PREFIX}/bin/qexec
+#	scripts/install-executable build/bin/qexec ${DESTDIR}${PREFIX}/bin/qexec
 
 .PHONY: devel
 devel: PREFIX := ${PWD}/install
 devel: clean install
-	qbroker --help
-	qexec --help
+	scripts/smoke-test

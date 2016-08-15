@@ -1,4 +1,4 @@
-#!/usr/bin/python3
+#!/usr/bin/python
 #
 # Licensed to the Apache Software Foundation (ASF) under one
 # or more contributor license agreements.  See the NOTICE file
@@ -42,13 +42,12 @@ def main():
                         help="Listen at HOST (default localhost)")
     parser.add_argument("--port", metavar="PORT", default="5672",
                         help="Listen at PORT (default 5672)")
-    parser.add_argument("--verbose", action="store_true",
-                        help="Even more logging than usual")
+    #parser.add_argument("--verbose", action="store_true",
+    #                    help="Even more logging than usual")
 
     args = parser.parse_args()
 
     interface = "{}:{}".format(args.host, args.port)
-    
     broker = Broker(interface)
 
     broker.run()
