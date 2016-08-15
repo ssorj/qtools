@@ -1,6 +1,6 @@
 # Qtools
 
-Simple AMQP messaging tools
+Simple command-line tools for sending and receiving AMQP messages.
 
 ## Arguments
 
