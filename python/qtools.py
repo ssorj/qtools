@@ -26,7 +26,6 @@ import uuid as _uuid
 
 from argparse import ArgumentParser
 from proton import Message, Endpoint
-from proton import Url # XXX
 from proton.handlers import MessagingHandler
 from proton.reactor import Container
 
@@ -140,12 +139,13 @@ class DrainHandler(MessagingHandler):
         print(message.format(*args))
 
     def on_start(self, event):
-        conn = event.container.connect(self.address, allowed_mechs="ANONYMOUS")
-        url = Url(self.address)
+        host, port, path = _parse_address(self.address)
+        domain = "{}:{}".format(host, port)
 
-        event.container.create_receiver(conn, url.path)
+        conn = event.container.connect(domain, allowed_mechs="ANONYMOUS")
+        event.container.create_receiver(conn, path)
 
-        self.print("Created receiver for source address '{}'", url.path)
+        self.print("Created receiver for source address '{}'", path)
 
     def on_link_opened(self, event):
         event.link.flow(1000000000)
