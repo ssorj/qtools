@@ -20,10 +20,12 @@
 from __future__ import print_function
 
 import collections as _collections
-import logging as _logging
+import os as _os
 import pencil as _pencil
+import sys as _sys
 import uuid as _uuid
 
+# XXX Don't leak names
 from argparse import ArgumentParser
 from proton import Message, Endpoint
 from proton.handlers import MessagingHandler
@@ -34,7 +36,35 @@ try:
 except ImportError:
     from urlparse import urlparse as _urlparse
 
-_log = _logging.getLogger("qtools")
+class _Application(object):
+    def __init__(self, name=None):
+        self.name = name
+        self.quiet = False
+        self.verbose = False
+
+        if self.name is None:
+            self.name = _os.path.split(_sys.argv[0])[1]
+
+    def __repr__(self):
+        return _pencil.format_repr(self, self.domain)
+
+    def debug(self, message, *args):
+        if not self.verbose:
+            return
+
+        self._print_message(message, args)
+
+    def notice(self, message, *args):
+        if self.quiet:
+            return
+
+        self._print_message(message, args)
+
+    def _print_message(self, message, args):
+        message = message.format(*args)
+        message = "{}: {}".format(self.name, message)
+
+        print(message)
 
 class SendHandler(MessagingHandler):
     def __init__(self, address, message_body):
@@ -296,17 +326,15 @@ class _BrokerHandler(MessagingHandler):
         for link in queue.consumers:
             queue.forward_messages(link)
 
-class Broker(object):
+class Broker(_Application):
     def __init__(self, domain):
+        super(Broker, self).__init__()
+
         self.domain = domain
         self.container = Container(_BrokerHandler(self))
 
     def __repr__(self):
         return _pencil.format_repr(self, self.domain)
-
-    def notice(self, message, *args):
-        message = message.format(*args)
-        _log.info(message)
 
     def run(self):
         self.container.run()

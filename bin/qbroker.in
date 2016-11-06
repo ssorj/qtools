@@ -24,14 +24,9 @@ import sys
 home = os.path.normpath("@qtools_home@")
 sys.path.insert(0, os.path.join(home, "python"))
 
-from spindle import *
 from qtools import *
 
 def main():
-    set_thread_name("qbroker")
-    add_logged_module("qtools")
-    enable_console_logging("info")
-    
     description = "A simple AMQP message broker for testing"
     parser = ArgumentParser(description=description)
 
