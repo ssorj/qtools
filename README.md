@@ -1,19 +1,20 @@
 # Qtools
 
-Simple command-line tools for sending and receiving AMQP messages.
+Command-line tools for sending and receiving AMQP messages.
 
 ## Arguments
 
-- ADDRESS
-- HOST
-- PORT
+- DOMAIN (HOST[:PORT])
+- ADDRESS ([//DOMAIN/]PATH)
+- -m, --messages COUNT
 - --verbose
+- --quiet
 
 ## Programs
 
-- qbroker --host HOST --port PORT
-- qsend ADDRESS MESSAGE
-- qreceive ADDRESS COUNT
+- qbroker HOST:PORT
+- qsend //HOST:PORT/PATH MESSAGE-BODY
+- qreceive //HOST:PORT/PATH
 
 ## Scenario 1
 
@@ -39,7 +40,6 @@ Simple command-line tools for sending and receiving AMQP messages.
 - qsend q0 --interactive
 - qreceive q0 --interactive - accept or reject
 - qreceive q0 --drain
-- qexec ADDRESS COMMAND
 
 ## Dependencies
 

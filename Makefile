@@ -12,7 +12,8 @@ help:
 	@echo "build          Build the code"
 	@echo "install        Install the code"
 	@echo "clean          Clean up the source tree"
-	@echo "devel          Build, install, and test in this checkout"
+	@echo "devel          Build, install, and sanity test in this checkout"
+	@echo "test           Run the tests"
 
 .PHONY: clean
 clean:
@@ -24,19 +25,25 @@ clean:
 .PHONY: build
 build:
 	scripts/configure-file bin/qbroker.in build/bin/qbroker qtools_home ${QTOOLS_HOME}
+	scripts/configure-file bin/qping.in build/bin/qping qtools_home ${QTOOLS_HOME}
 	scripts/configure-file bin/qsend.in build/bin/qsend qtools_home ${QTOOLS_HOME}
 	scripts/configure-file bin/qreceive.in build/bin/qreceive qtools_home ${QTOOLS_HOME}
-#	scripts/configure-file bin/qexec.in build/bin/qexec qtools_home ${QTOOLS_HOME}
+	scripts/configure-file bin/qdrain.in build/bin/qdrain qtools_home ${QTOOLS_HOME}
 
 .PHONY: install
 install: build
 	scripts/install-files python ${DESTDIR}${QTOOLS_HOME}/python \*.py
-	scripts/install-executable build/bin/qbroker ${DESTDIR}${PREFIX}/bin/qbroker
-	scripts/install-executable build/bin/qsend ${DESTDIR}${PREFIX}/bin/qsend
-	scripts/install-executable build/bin/qreceive ${DESTDIR}${PREFIX}/bin/qreceive
-#	scripts/install-executable build/bin/qexec ${DESTDIR}${PREFIX}/bin/qexec
+	scripts/install-files build/bin ${DESTDIR}${PREFIX}/bin \*
 
 .PHONY: devel
 devel: PREFIX := ${PWD}/install
-devel: clean install
+devel: install
+	qbroker --help > /dev/null
+	qping --help > /dev/null
+	qsend --help > /dev/null
+	qreceive --help > /dev/null
+	qdrain --help > /dev/null
+
+.PHONY:
+test: devel
 	scripts/smoke-test

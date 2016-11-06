@@ -21,12 +21,9 @@
 import os
 import sys
 
-default_qtools_home = os.path.normpath("@qtools_home@")
-qtools_home = os.environ.get("QTOOLS_HOME", default_qtools_home)
+home = os.path.normpath("@qtools_home@")
+sys.path.insert(0, os.path.join(home, "python"))
 
-sys.path.insert(0, os.path.join(qtools_home, "python"))
-
-from argparse import ArgumentParser
 from qtools import *
 
 def main():
@@ -34,18 +31,13 @@ def main():
     parser = ArgumentParser(description=description)
 
     parser.add_argument("address", metavar="ADDRESS")
-    parser.add_argument("max_count", metavar="MAX-COUNT",
-                        nargs="?", type=int, default=1)
+    parser.add_argument("-m", "--messages", metavar="COUNT",
+                        type=int, default=1)
     parser.add_argument("--verbose", action="store_true")
 
     args = parser.parse_args()
 
-    address = args.address
-
-    if "/" not in address:
-        address = "localhost:5672/{}".format(address)
-    
-    handler = ReceiveHandler(address, args.max_count)
+    handler = ReceiveHandler(args.address, args.messages)
     handler.verbose = args.verbose
 
     container = Container(handler)

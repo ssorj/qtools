@@ -22,10 +22,10 @@
 set -e
 
 sent_message=$RANDOM
-address=localhost:56720/q0
+domain=localhost:56720
+address=//$domain/q0
 
-qbroker --port 56720 &
-
+qbroker $domain &
 broker_pid=$!
 
 trap "kill $broker_pid" EXIT
