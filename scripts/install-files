@@ -7,9 +7,9 @@
 # to you under the Apache License, Version 2.0 (the
 # "License"); you may not use this file except in compliance
 # with the License.  You may obtain a copy of the License at
-# 
+#
 #   http://www.apache.org/licenses/LICENSE-2.0
-# 
+#
 # Unless required by applicable law or agreed to in writing,
 # software distributed under the License is distributed on an
 # "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
@@ -31,22 +31,21 @@ def main():
 
      parser.add_argument("input_dirs", metavar="INPUT-DIR", nargs="+")
      parser.add_argument("output_dir", metavar="OUTPUT-DIR")
-     parser.add_argument("-n", "--name", metavar="FILE-GLOB")
+     parser.add_argument("-n", "--name", metavar="FILE-GLOB", action="append")
 
      args = parser.parse_args()
 
      subpaths = list()
-          
+
      for input_dir in args.input_dirs:
           for root, dirs, files in os.walk(input_dir):
                matched_files = set()
 
-               # XXX Multiple globs
-               
                if args.name is None:
                     matched_files.update(files)
                else:
-                    matched_files.update(fnmatch.filter(files, args.name))
+                    for name in args.name:
+                         matched_files.update(fnmatch.filter(files, name))
 
                dir = root[len(input_dir) + 1:]
 
