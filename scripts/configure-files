@@ -21,7 +21,6 @@
 from __future__ import print_function
 
 import argparse
-import fnmatch
 import os
 import shutil
 import sys
@@ -29,40 +28,34 @@ import sys
 def main():
      parser = argparse.ArgumentParser()
 
-     parser.add_argument("input_dirs", metavar="INPUT-DIR", nargs="+")
+     parser.add_argument("input_files", metavar="INPUT-FILE", nargs="+")
      parser.add_argument("output_dir", metavar="OUTPUT-DIR")
-     parser.add_argument("-n", "--name", metavar="FILE-GLOB")
+     parser.add_argument("-a", "--attribute", metavar="NAME=VALUE")
+     # XXX Multiple attributes
 
      args = parser.parse_args()
 
-     subpaths = list()
+     if not os.path.exists(args.output_dir):
+          os.makedirs(args.output_dir)
+     
+     for input_file in args.input_files:
+          with open(input_file, "r") as f:
+               content = f.read()
+
+          name, value = args.attribute.split("=", 1)
+          content = content.replace("@{}@".format(name), value)
+
+          input_file_name = os.path.split(input_file)[1]
+          output_file = os.path.join(args.output_dir, input_file_name)
+
+          if output_file.endswith(".in"):
+               output_file = output_file[:-3]
           
-     for input_dir in args.input_dirs:
-          for root, dirs, files in os.walk(input_dir):
-               matched_files = set()
+          with open(output_file, "w") as f:
+               f.write(content)
 
-               # XXX Multiple globs
-               
-               if args.name is None:
-                    matched_files.update(files)
-               else:
-                    matched_files.update(fnmatch.filter(files, args.name))
-
-               dir = root[len(input_dir) + 1:]
-
-               for file in matched_files:
-                    subpaths.append(os.path.join(dir, file))
-
-          for subpath in subpaths:
-               input_file = os.path.join(input_dir, subpath)
-               output_file = os.path.join(args.output_dir, subpath)
-               parent_dir = os.path.dirname(output_file)
-
-               if not os.path.isdir(parent_dir):
-                    os.makedirs(parent_dir)
-
-               shutil.copy(input_file, output_file)
-
+          shutil.copymode(input_file, output_file)
+     
 if __name__ == "__main__":
     try:
         main()

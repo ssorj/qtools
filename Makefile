@@ -1,8 +1,8 @@
-export PATH := ${PWD}/install/bin:${PATH}
-
 DESTDIR := ""
 PREFIX := ${HOME}/.local
-QTOOLS_HOME = ${PREFIX}/share/qtools
+home = ${PREFIX}/share/qtools
+
+export PATH := ${PWD}/install/bin:${PATH}
 
 .PHONY: default
 default: devel
@@ -12,7 +12,7 @@ help:
 	@echo "build          Build the code"
 	@echo "install        Install the code"
 	@echo "clean          Clean up the source tree"
-	@echo "devel          Build, install, and sanity test in this checkout"
+	@echo "devel          Build, install, and run a basic test in this checkout"
 	@echo "test           Run the tests"
 
 .PHONY: clean
@@ -24,16 +24,12 @@ clean:
 
 .PHONY: build
 build:
-	scripts/configure-file bin/qbroker.in build/bin/qbroker qtools_home ${QTOOLS_HOME}
-	scripts/configure-file bin/qping.in build/bin/qping qtools_home ${QTOOLS_HOME}
-	scripts/configure-file bin/qsend.in build/bin/qsend qtools_home ${QTOOLS_HOME}
-	scripts/configure-file bin/qreceive.in build/bin/qreceive qtools_home ${QTOOLS_HOME}
-	scripts/configure-file bin/qdrain.in build/bin/qdrain qtools_home ${QTOOLS_HOME}
+	scripts/configure-files -a qtools_home=${home} bin/*.in build/bin
 
 .PHONY: install
 install: build
-	scripts/install-files python ${DESTDIR}${QTOOLS_HOME}/python \*.py
-	scripts/install-files build/bin ${DESTDIR}${PREFIX}/bin \*
+	scripts/install-files build/bin ${DESTDIR}${PREFIX}/bin
+	scripts/install-files --name \*.py python ${DESTDIR}${home}/python
 
 .PHONY: devel
 devel: PREFIX := ${PWD}/install
