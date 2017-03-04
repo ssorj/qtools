@@ -31,12 +31,15 @@ def main():
     parser = ArgumentParser(description=description)
 
     parser.add_argument("domain", metavar="DOMAIN", default="localhost:5672")
-    parser.add_argument("--verbose", action="store_true",
-                        help="Even more logging than usual")
+    parser.add_argument("--quiet", action="store_true")
+    parser.add_argument("--verbose", action="store_true")
 
     args = parser.parse_args()
 
     broker = Broker(args.domain)
+    broker.quiet = args.quiet
+    broker.verbose = args.verbose
+    
     broker.run()
 
 if __name__ == "__main__":

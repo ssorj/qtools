@@ -32,15 +32,16 @@ def main():
 
     parser.add_argument("address", metavar="ADDRESS")
     parser.add_argument("body", metavar="MESSAGE-BODY", nargs="?")
+    parser.add_argument("--quiet", action="store_true")
     parser.add_argument("--verbose", action="store_true")
 
     args = parser.parse_args()
 
-    handler = SendHandler(args.address, args.body)
-    handler.verbose = args.verbose
-
-    container = Container(handler)
-    container.run()
+    client = SendClient(args.address, args.body)
+    client.quiet = args.quiet
+    client.verbose = args.verbose
+    
+    client.run()
 
 if __name__ == "__main__":
     try:
