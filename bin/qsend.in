@@ -21,30 +21,11 @@
 import os
 import sys
 
-home = os.path.normpath("@qtools_home@")
-sys.path.insert(0, os.path.join(home, "python"))
+home_dir = os.path.normpath("@qtools_home@")
+sys.path.insert(0, os.path.join(home_dir, "python"))
 
-from qtools import *
-
-def main():
-    description = "Send AMQP messages"
-    parser = ArgumentParser(description=description)
-
-    parser.add_argument("address", metavar="ADDRESS")
-    parser.add_argument("body", metavar="MESSAGE-BODY", nargs="?")
-    parser.add_argument("--quiet", action="store_true")
-    parser.add_argument("--verbose", action="store_true")
-
-    args = parser.parse_args()
-
-    client = SendClient(args.address, args.body)
-    client.quiet = args.quiet
-    client.verbose = args.verbose
-    
-    client.run()
+from qtools.send import SendCommand
 
 if __name__ == "__main__":
-    try:
-        main()
-    except KeyboardInterrupt:
-        pass
+    command = SendCommand(home_dir)
+    command.main()

@@ -21,30 +21,11 @@
 import os
 import sys
 
-home = os.path.normpath("@qtools_home@")
-sys.path.insert(0, os.path.join(home, "python"))
+home_dir = os.path.normpath("@qtools_home@")
+sys.path.insert(0, os.path.join(home_dir, "python"))
 
-from qtools import *
-
-def main():
-    description = "Drain AMQP messages"
-    parser = ArgumentParser(description=description)
-
-    parser.add_argument("address", metavar="ADDRESS")
-    parser.add_argument("-m", "--messages", metavar="COUNT",
-                        type=int)
-    parser.add_argument("--verbose", action="store_true")
-
-    args = parser.parse_args()
-    
-    handler = DrainHandler(args.address)
-    handler.verbose = args.verbose
-
-    container = Container(handler)
-    container.run()
+from qtools.drain import DrainCommand
 
 if __name__ == "__main__":
-    try:
-        main()
-    except KeyboardInterrupt:
-        pass
+    command = DrainCommand(home_dir)
+    command.main()

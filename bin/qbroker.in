@@ -7,9 +7,9 @@
 # to you under the Apache License, Version 2.0 (the
 # "License"); you may not use this file except in compliance
 # with the License.  You may obtain a copy of the License at
-# 
+#
 #   http://www.apache.org/licenses/LICENSE-2.0
-# 
+#
 # Unless required by applicable law or agreed to in writing,
 # software distributed under the License is distributed on an
 # "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
@@ -21,29 +21,11 @@
 import os
 import sys
 
-home = os.path.normpath("@qtools_home@")
-sys.path.insert(0, os.path.join(home, "python"))
+home_dir = os.path.normpath("@qtools_home@")
+sys.path.insert(0, os.path.join(home_dir, "python"))
 
-from qtools import *
-
-def main():
-    description = "A simple AMQP message broker for testing"
-    parser = ArgumentParser(description=description)
-
-    parser.add_argument("domain", metavar="DOMAIN", default="localhost:5672")
-    parser.add_argument("--quiet", action="store_true")
-    parser.add_argument("--verbose", action="store_true")
-
-    args = parser.parse_args()
-
-    broker = Broker(args.domain)
-    broker.quiet = args.quiet
-    broker.verbose = args.verbose
-    
-    broker.run()
+from qtools.broker import BrokerCommand
 
 if __name__ == "__main__":
-    try:
-        main()
-    except KeyboardInterrupt:
-        pass
+    command = BrokerCommand(home_dir)
+    command.main()

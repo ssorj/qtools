@@ -35,9 +35,9 @@ sleep 0.2
 qsend --verbose $address $sent_message
 received_message=$(qreceive $address)
 
-echo "qreceive: Received message '$received_message'"
+echo "smoke-test: PASSED"
 
 if [[ $sent_message != $received_message ]]; then
-    echo "Failure!"
+    echo "smoke-test: FAILED"
     exit 1
 fi
