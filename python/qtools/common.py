@@ -57,7 +57,7 @@ class Command(object):
             if "=" not in arg:
                 self.name = arg.rsplit("/", 1)[-1]
                 break
-            
+
         self.args = None
 
     def __repr__(self):
@@ -95,7 +95,7 @@ class Command(object):
             _sys.exit(1)
         except KeyboardInterrupt:
             pass
-    
+
     def debug(self, message, *args):
         if not self.verbose:
             return
@@ -110,7 +110,7 @@ class Command(object):
 
     def error(self, message, *args):
         self._print_message(message, args)
-        
+
     def _print_message(self, message, args):
         message = message.format(*args)
         message = "{}: {}".format(self.name, message)
@@ -122,19 +122,23 @@ def parse_address_url(address):
     url = _urlparse(address)
 
     if url.path is None:
-        raise CommandError("The address URL has no path")
+        raise CommandError("The URL has no path")
 
     host = url.hostname
     port = url.port
-    path = url.path[1:]
+    path = url.path
 
     if host is None:
-        host = "localhost"
+        # XXX Should be "localhost" - a workaround for a proton issue
+        host = "127.0.0.1"
 
     if port is None:
-        port = 5672
+        port = "5672"
 
     port = str(port)
+
+    if path.startswith("/"):
+        path = path[1:]
 
     return host, port, path
 
