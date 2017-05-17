@@ -58,6 +58,7 @@ devel: install
 	qsend --help > /dev/null
 	qreceive --help > /dev/null
 	qdrain --help > /dev/null
+	qcall --help > /dev/null
 
 .PHONY:
 test: devel
