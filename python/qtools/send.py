@@ -37,7 +37,7 @@ class SendCommand(Command):
 
         self.parser.description = _description
 
-        self.parser.add_argument("address", metavar="ADDRESS")
+        self.parser.add_argument("address", metavar="ADDRESS-URL")
         self.parser.add_argument("body", metavar="MESSAGE-BODY", nargs="?")
 
         self.add_common_arguments()

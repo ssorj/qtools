@@ -2,23 +2,7 @@
 
 Command-line tools for sending and receiving AMQP messages.
 
-## Arguments
-
-- DOMAIN (HOST[:PORT])
-- ADDRESS ([//DOMAIN/]PATH)
-- -m, --messages COUNT
-- --verbose
-- --quiet
-
-## Programs
-
-- qbroker HOST:PORT
-- qsend //HOST:PORT/PATH MESSAGE-BODY
-- qreceive //HOST:PORT/PATH
-
-## Scenario 1
-
-    % qbroker &
+    % qbroker localhost:5672 &
     % qsend q0 "Hello!"
     qbroker: Received message "Hello!"
     qbroker: Created queue "q0"
@@ -35,13 +19,14 @@ Command-line tools for sending and receiving AMQP messages.
     qbroker: ...
     Hello again!
 
-## Ideas
+## Programs
 
-- qsend q0 --interactive
-- qreceive q0 --interactive - accept or reject
-- qreceive q0 --drain
+ - qbroker HOST:PORT
+ - qsend [//HOST:PORT/]PATH MESSAGE-BODY
+ - qreceive [//HOST:PORT]/PATH
+ - qcall [//HOST:PORT/]PATH MESSAGE-BODY
 
 ## Dependencies
 
-- python
-- python-qpid-proton
+ - python
+ - python-qpid-proton

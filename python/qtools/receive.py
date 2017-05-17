@@ -37,7 +37,7 @@ class ReceiveCommand(Command):
 
         self.parser.description = _description
 
-        self.parser.add_argument("address", metavar="ADDRESS")
+        self.parser.add_argument("address", metavar="ADDRESS-URL")
         self.parser.add_argument("-m", "--messages", metavar="COUNT",
                                  type=int, default=1)
         self.parser.add_argument("--forever", action="store_true")

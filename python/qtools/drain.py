@@ -25,6 +25,7 @@ from __future__ import with_statement
 
 import proton as _proton
 import proton.handlers as _handlers
+import proton.reactor as _reactor
 
 from .common import *
 
@@ -36,7 +37,7 @@ class DrainCommand(Command):
 
         self.parser.description = _description
 
-        self.parser.add_argument("address", metavar="ADDRESS")
+        self.parser.add_argument("address", metavar="ADDRESS-URL")
         self.parser.add_argument("-m", "--messages", metavar="COUNT",
                                  type=int, default=1)
 
@@ -51,34 +52,25 @@ class DrainCommand(Command):
         self.init_common_attributes()
 
     def run(self):
-        handler = _DrainHandler(self.address)
-        handler.verbose = self.verbose
+        handler = _DrainHandler(self)
+        container = _reactor.Container(handler)
 
-        container = Container(handler)
         container.run()
 
 class _DrainHandler(_handlers.MessagingHandler):
     def __init__(self, command):
-        super(DrainHandler, self).__init__()
+        super(_DrainHandler, self).__init__()
 
         self.command = command
 
-    def print(self, message, *args):
-        if not self.verbose:
-            return
-
-        message = "qdrain: {}".format(message)
-
-        print(message.format(*args))
-
     def on_start(self, event):
-        host, port, path = _parse_address(self.address)
+        host, port, path = parse_address_url(self.command.address)
         domain = "{}:{}".format(host, port)
 
-        conn = event.container.connect(domain, allowed_mechs="ANONYMOUS")
+        conn = event.container.connect(domain, allowed_mechs=b"ANONYMOUS")
         event.container.create_receiver(conn, path)
 
-        self.print("Created receiver for source address '{}'", path)
+        self.command.notice("Created receiver for source address '{}'", path)
 
     def on_link_opened(self, event):
         event.link.flow(1000000000)

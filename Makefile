@@ -54,11 +54,11 @@ install: build
 devel: PREFIX := ${PWD}/install
 devel: install
 	qbroker --help > /dev/null
-	qping --help > /dev/null
 	qsend --help > /dev/null
 	qreceive --help > /dev/null
-	qdrain --help > /dev/null
 	qcall --help > /dev/null
+#	qdrain --help > /dev/null
+#	qping --help > /dev/null
 
 .PHONY:
 test: devel
