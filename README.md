@@ -23,7 +23,7 @@ Command-line tools for sending and receiving AMQP messages.
 
  - qbroker HOST:PORT
  - qsend [//HOST:PORT/]PATH MESSAGE-BODY
- - qreceive [//HOST:PORT]/PATH
+ - qreceive [//HOST:PORT/]PATH
  - qcall [//HOST:PORT/]PATH MESSAGE-BODY
 
 ## Dependencies
