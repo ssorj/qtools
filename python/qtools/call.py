@@ -79,7 +79,7 @@ class _CallHandler(_handlers.MessagingHandler):
 
     def on_link_opened(self, event):
         if event.receiver == self.receiver:
-            request = _proton.Message(self.command.body)
+            request = _proton.Message(unicode(self.command.body))
             request.reply_to = self.receiver.remote_source.address
 
             self.sender.send(request)

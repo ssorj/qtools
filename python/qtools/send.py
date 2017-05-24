@@ -77,7 +77,7 @@ class _SendHandler(_handlers.MessagingHandler):
         if self.sent:
             return
 
-        message = _proton.Message(self.command.body)
+        message = _proton.Message(unicode(self.command.body))
         event.sender.send(message)
 
         self.command.notice("Sent message '{}'", self.command.body)
