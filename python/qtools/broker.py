@@ -27,6 +27,7 @@ import collections as _collections
 import proton as _proton
 import proton.handlers as _handlers
 import proton.reactor as _reactor
+import uuid as _uuid
 
 from .common import *
 
@@ -38,7 +39,8 @@ class BrokerCommand(Command):
 
         self.parser.description = _description
 
-        self.parser.add_argument("domain", metavar="DOMAIN", default="localhost:5672")
+        self.parser.add_argument("--host", metavar="HOST", default="localhost")
+        self.parser.add_argument("--port", metavar="PORT", default=5672)
 
         self.add_common_arguments()
 
@@ -47,7 +49,8 @@ class BrokerCommand(Command):
 
         self.init_common_attributes()
 
-        self.domain = self.args.domain
+        self.host = self.args.host
+        self.port = self.args.port
 
     def run(self):
         handler = _BrokerHandler(self)
@@ -109,9 +112,11 @@ class _BrokerHandler(_handlers.MessagingHandler):
         self.verbose = False
 
     def on_start(self, event):
-        self.acceptor = event.container.listen(self.command.domain)
+        domain = "{}:{}".format(self.command.host, self.command.port)
 
-        self.command.notice("Listening on '{}'", self.command.domain)
+        self.acceptor = event.container.listen(domain)
+
+        self.command.notice("Listening on '{}'", domain)
 
     def get_queue(self, address):
         try:
