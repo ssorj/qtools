@@ -57,7 +57,7 @@ class BrokerCommand(Command):
         container = _reactor.Container(handler)
 
         container.run()
-        
+
 class _BrokerQueue(object):
     def __init__(self, command, address):
         self.command = command
@@ -108,7 +108,7 @@ class _BrokerHandler(_handlers.MessagingHandler):
         super(_BrokerHandler, self).__init__()
 
         self.command = command
-        self.queues = dict()        
+        self.queues = dict()
         self.verbose = False
 
     def on_start(self, event):
@@ -142,9 +142,6 @@ class _BrokerHandler(_handlers.MessagingHandler):
 
         if event.link.is_receiver:
             address = event.link.remote_target.address
-
-            assert address is not None
-
             event.link.target.address = address
 
     def on_link_closing(self, event):
@@ -183,8 +180,14 @@ class _BrokerHandler(_handlers.MessagingHandler):
         queue.forward_messages(event.link)
 
     def on_message(self, event):
-        queue = self.get_queue(event.link.target.address)
-        queue.store_message(event.message)
+        message = event.message
+        address = event.link.target.address
+
+        if address is None:
+            address = message.address
+
+        queue = self.get_queue(address)
+        queue.store_message(message)
 
         for link in queue.consumers:
             queue.forward_messages(link)
