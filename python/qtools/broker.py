@@ -39,8 +39,10 @@ class BrokerCommand(Command):
 
         self.parser.description = _description
 
-        self.parser.add_argument("--host", metavar="HOST", default="localhost")
-        self.parser.add_argument("--port", metavar="PORT", default=5672)
+        self.parser.add_argument("--host", metavar="HOST", default="127.0.0.1",
+                                 help="Listen on HOST")
+        self.parser.add_argument("--port", metavar="PORT", default=5672,
+                                 help="Listen on PORT")
 
         self.add_common_arguments()
 
