@@ -39,10 +39,11 @@ class SendCommand(Command):
 
         self.parser.description = _description
 
-        self.parser.add_argument("url", metavar="ADDRESS-URL",
-                                 help="The location of a queue or topic")
-        self.parser.add_argument("message", metavar="MESSAGE", nargs="*",
-                                 help="The message content")
+        self.parser.add_argument("url", metavar="ADDRESS-URL", nargs="+",
+                                 help="The location of a message target")
+        self.parser.add_argument("-m", "--message", metavar="MESSAGE",
+                                 action="append", default=list(),
+                                 help="A string containing message content")
         self.parser.add_argument("--prompt", action="store_true",
                                  help="Prompt for messages on the console")
 
@@ -53,28 +54,33 @@ class SendCommand(Command):
         self.container = _reactor.Container(handler)
         self.events = _reactor.EventInjector()
         self.messages = _collections.deque()
+        self.ready = _threading.Event()
         self.console_input_thread = _ConsoleInputThread(self)
+
+        self.container.selectable(self.events)
 
     def init(self):
         super(SendCommand, self).init()
 
         self.init_common_attributes()
 
-        self.url = self.args.url
-        self.command_line_messages = self.args.message
+        self.urls = self.args.url
         self.prompt = self.args.prompt
 
-        for message in self.command_line_messages:
-            pmessage = _proton.Message(unicode(message))
-            self.messages.appendleft(pmessage)
+        for value in self.args.message:
+            message = _proton.Message(unicode(value))
+            self.messages.appendleft(message)
 
-        if not self.prompt:
+        if self.prompt:
+            self.quiet = True
+        else:
             if not self.messages:
-                self.parser.error("No message. Use --prompt or provide one as an argument.")
+                self.parser.error("No message. Use --prompt or --message.")
 
             self.messages.appendleft(None)
 
     def run(self):
+        self.console_input_thread.start()
         self.container.run()
 
 class _ConsoleInputThread(_threading.Thread):
@@ -85,67 +91,72 @@ class _ConsoleInputThread(_threading.Thread):
         self.daemon = True
 
     def run(self):
-        print("Type Ctrl-D to exit.")
+        print("Connecting...")
+
+        self.command.ready.wait()
+
+        print("Ready. Type Ctrl-D to exit.")
 
         while True:
             try:
                 body = raw_input("> ")
             except EOFError:
-                self.command.messages.appendleft(None)
-                self.command.events.trigger(_reactor.ApplicationEvent("input"))
+                self.send_input(None)
                 print()
-
                 break
 
             message = _proton.Message(unicode(body))
+            self.send_input(message)
 
-            self.command.messages.appendleft(message)
-            self.command.events.trigger(_reactor.ApplicationEvent("input"))
+    def send_input(self, message):
+        self.command.messages.appendleft(message)
+        self.command.events.trigger(_reactor.ApplicationEvent("input"))
 
 class _SendHandler(_handlers.MessagingHandler):
     def __init__(self, command):
         super(_SendHandler, self).__init__()
 
         self.command = command
-        self.connection = None
-        self.sender = None
+        self.connections = set()
+        self.senders = _collections.deque()
         self.stop_requested = False
 
     def on_start(self, event):
-        host, port, path = parse_address_url(self.command.url)
-        domain = "{}:{}".format(host, port)
+        for url in self.command.urls:
+            host, port, path = parse_address_url(url)
+            domain = "{}:{}".format(host, port)
 
-        self.connection = event.container.connect(domain, allowed_mechs=b"ANONYMOUS")
-        self.sender = event.container.create_sender(self.connection, path)
+            connection = event.container.connect(domain, allowed_mechs=b"ANONYMOUS")
+            sender = event.container.create_sender(connection, path)
+
+            self.connections.add(connection)
+            self.senders.appendleft(sender)
 
     def on_connection_opened(self, event):
-        # XXX "is" checks fail here
-        assert event.connection == self.connection
+        assert event.connection in self.connections
 
         # XXX Connected to what?  Transport doesn't have what I need.
         self.command.notice("Connected")
 
     def on_link_opened(self, event):
-        # XXX "is" checks fail here
-        assert event.link == self.sender
+        assert event.link in self.senders
 
         self.command.notice("Created sender for target address '{}'", event.link.target.address)
 
-        if self.command.prompt:
-            self.command.container.selectable(self.command.events)
-            self.command.console_input_thread.start()
+        if self.command.prompt and len(self.senders) == len(self.command.urls):
+            self.command.ready.set()
 
     def on_sendable(self, event):
-        self.send_message()
+        self.send_message(event)
 
     def on_input(self, event):
-        self.send_message()
+        self.send_message(event)
 
     def on_accepted(self, event):
         if self.stop_requested:
             self.close()
 
-    def send_message(self):
+    def send_message(self, event):
         if self.stop_requested:
             return
 
@@ -154,23 +165,30 @@ class _SendHandler(_handlers.MessagingHandler):
         except IndexError:
             return
 
+        sender = event.link
+
+        if sender is None:
+            sender = self.senders.pop()
+            self.senders.appendleft(sender)
+
         if message is None:
-            if self.sender.unsettled == 0:
+            if sender.unsettled == 0:
                 self.close()
             else:
                 self.stop_requested = True
 
             return
 
-        if not self.sender.credit:
+        if not sender.credit:
             self.command.messages.append(message)
             return
 
-        self.sender.send(message)
+        sender.send(message)
 
-        if not self.command.prompt:
-            self.command.notice("Sent message '{}'", message.body)
+        self.command.notice("Sent message '{}' to '{}'", message.body, sender.target.address)
 
     def close(self):
-        self.connection.close()
+        for connection in self.connections:
+            connection.close()
+
         self.command.events.close()

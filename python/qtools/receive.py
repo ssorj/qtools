@@ -37,8 +37,8 @@ class ReceiveCommand(Command):
 
         self.parser.description = _description
 
-        self.parser.add_argument("url", metavar="ADDRESS-URL",
-                                 help="The location of a queue or topic")
+        self.parser.add_argument("url", metavar="ADDRESS-URL", nargs="+",
+                                 help="The location of a message source")
         self.parser.add_argument("-m", "--messages", metavar="COUNT",
                                  type=int, default=0,
                                  help="Receive COUNT messages; 0 means no limit")
@@ -48,8 +48,8 @@ class ReceiveCommand(Command):
     def init(self):
         super(ReceiveCommand, self).init()
 
-        self.url = self.args.url
-        self.requested_messages = self.args.messages
+        self.urls = self.args.url
+        self.max_messages = self.args.messages
 
         self.init_common_attributes()
 
@@ -64,34 +64,36 @@ class _ReceiveHandler(_handlers.MessagingHandler):
         super(_ReceiveHandler, self).__init__()
 
         self.command = command
-        self.connection = None
-        self.receiver = None
+        self.connections = set()
+        self.receivers = set()
         self.count = 0
 
     def on_start(self, event):
-        host, port, path = parse_address_url(self.command.url)
-        domain = "{}:{}".format(host, port)
+        for url in self.command.urls:
+            host, port, path = parse_address_url(url)
+            domain = "{}:{}".format(host, port)
 
-        self.connection = event.container.connect(domain, allowed_mechs=b"ANONYMOUS")
-        self.receiver = event.container.create_receiver(self.connection, path)
+            connection = event.container.connect(domain, allowed_mechs=b"ANONYMOUS")
+            receiver = event.container.create_receiver(connection, path)
+
+            self.connections.add(connection)
+            self.receivers.add(receiver)
 
     def on_connection_opened(self, event):
-        # XXX "is" checks fail here
-        assert event.connection == self.connection
+        assert event.connection in self.connections
 
         # XXX Connected to what?  Transport doesn't have what I need.
         self.command.notice("Connected")
 
     def on_link_opened(self, event):
-        # XXX "is" checks fail here
-        assert event.link == self.receiver
+        assert event.link in self.receivers
 
         self.command.notice("Created receiver for source address '{}'", event.link.source.address)
 
     def on_message(self, event):
         self.count += 1
 
-        if self.count == self.command.requested_messages:
+        if self.count == self.command.max_messages:
             return
 
         if self.command.verbose:
@@ -99,5 +101,5 @@ class _ReceiveHandler(_handlers.MessagingHandler):
 
         print(event.message.body)
 
-        if self.command.requested_messages:
+        if self.count == self.command.max_messages:
             self.connection.close()
