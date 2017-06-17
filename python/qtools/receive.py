@@ -88,7 +88,9 @@ class _ReceiveHandler(_handlers.MessagingHandler):
     def on_link_opened(self, event):
         assert event.link in self.receivers
 
-        self.command.notice("Created receiver for source address '{}'", event.link.source.address)
+        self.command.notice("Created receiver for source address '{}' on container '{}'",
+                            event.link.source.address,
+                            event.connection.remote_container)
 
     def on_message(self, event):
         self.count += 1
@@ -96,10 +98,13 @@ class _ReceiveHandler(_handlers.MessagingHandler):
         if self.count == self.command.max_messages:
             return
 
-        if self.command.verbose:
-            self.command.notice("Received message '{}'", event.message.body)
-
         print(event.message.body)
+
+        if self.command.verbose:
+            self.command.notice("Received message '{}' from '{}' on '{}'",
+                                event.message.body,
+                                event.link.source.address,
+                                event.connection.remote_container)
 
         if self.count == self.command.max_messages:
             self.connection.close()

@@ -24,9 +24,11 @@ from __future__ import unicode_literals
 from __future__ import with_statement
 
 import argparse as _argparse
+import binascii as _binascii
 import pencil as _pencil
 import proton as _proton
 import sys as _sys
+import uuid as _uuid
 
 try:
     from urllib.parse import urlparse as _urlparse
@@ -64,12 +66,14 @@ class Command(object):
         return _pencil.format_repr(self)
 
     def add_common_arguments(self):
-        self.parser.add_argument("--init-only", action="store_true",
-                                 help=_argparse.SUPPRESS)
+        self.parser.add_argument("--id", metavar="ID",
+                                 help="Set the container identity to ID")
         self.parser.add_argument("--quiet", action="store_true",
                                  help="Print no logging to the console")
         self.parser.add_argument("--verbose", action="store_true",
                                  help="Print detailed logging to the console")
+        self.parser.add_argument("--init-only", action="store_true",
+                                 help=_argparse.SUPPRESS)
 
     def init(self):
         assert self.parser is not None
@@ -78,9 +82,16 @@ class Command(object):
         self.args = self.parser.parse_args()
 
     def init_common_attributes(self):
-        self.init_only = self.args.init_only
+        self.id = self.args.id
         self.quiet = self.args.quiet
         self.verbose = self.args.verbose
+        self.init_only = self.args.init_only
+
+        if self.id is None:
+            bytes_ = _uuid.uuid4().bytes[:2]
+            hex_ = _binascii.hexlify(bytes_).decode("utf-8")
+
+            self.id = "{}-{}".format(self.name, hex_)
 
     def run(self):
         raise NotImplementedError()
@@ -116,7 +127,7 @@ class Command(object):
 
     def _print_message(self, message, args):
         message = message.format(*args)
-        message = "{}: {}".format(self.name, message)
+        message = "{}: {}".format(self.id, message)
 
         _sys.stderr.write("{}\n".format(message))
         _sys.stderr.flush()

@@ -141,7 +141,9 @@ class _SendHandler(_handlers.MessagingHandler):
     def on_link_opened(self, event):
         assert event.link in self.senders
 
-        self.command.notice("Created sender for target address '{}'", event.link.target.address)
+        self.command.notice("Created sender for target address '{}' on container '{}'",
+                            event.link.target.address,
+                            event.connection.remote_container)
 
         if self.command.prompt and len(self.senders) == len(self.command.urls):
             self.command.ready.set()
@@ -185,7 +187,10 @@ class _SendHandler(_handlers.MessagingHandler):
 
         sender.send(message)
 
-        self.command.notice("Sent message '{}' to '{}'", message.body, sender.target.address)
+        self.command.notice("Sent message '{}' to '{}' on '{}'",
+                            message.body,
+                            sender.target.address,
+                            sender.connection.remote_container)
 
     def close(self):
         for connection in self.connections:
