@@ -40,8 +40,8 @@ class ReceiveCommand(Command):
         self.parser.add_argument("url", metavar="ADDRESS-URL",
                                  help="The location of a queue or topic")
         self.parser.add_argument("-m", "--messages", metavar="COUNT",
-                                 type=int, default=1)
-        self.parser.add_argument("--forever", action="store_true")
+                                 type=int, default=0,
+                                 help="Receive COUNT messages; 0 means no limit")
 
         self.add_common_arguments()
 
@@ -49,7 +49,7 @@ class ReceiveCommand(Command):
         super(ReceiveCommand, self).init()
 
         self.url = self.args.url
-        self.messages = self.args.messages
+        self.requested_messages = self.args.messages
 
         self.init_common_attributes()
 
@@ -84,12 +84,14 @@ class _ReceiveHandler(_handlers.MessagingHandler):
 
     def on_link_opened(self, event):
         # XXX "is" checks fail here
-        assert event.link == self.sender
+        assert event.link == self.receiver
 
         self.command.notice("Created receiver for source address '{}'", event.link.source.address)
 
     def on_message(self, event):
-        if self.count == self.command.messages:
+        self.count += 1
+
+        if self.count == self.command.requested_messages:
             return
 
         if self.command.verbose:
@@ -97,7 +99,5 @@ class _ReceiveHandler(_handlers.MessagingHandler):
 
         print(event.message.body)
 
-        self.count += 1
-
-        if self.count == self.command.messages:
-            event.connection.close()
+        if self.command.requested_messages:
+            self.connection.close()
