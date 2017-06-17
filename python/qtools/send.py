@@ -69,6 +69,9 @@ class SendCommand(Command):
             self.messages.appendleft(pmessage)
 
         if not self.prompt:
+            if not self.messages:
+                self.parser.error("No message. Use --prompt or provide one as an argument.")
+
             self.messages.appendleft(None)
 
     def run(self):
@@ -82,6 +85,8 @@ class _ConsoleInputThread(_threading.Thread):
         self.daemon = True
 
     def run(self):
+        print("Type Ctrl-D to exit.")
+
         while True:
             try:
                 body = raw_input("> ")
