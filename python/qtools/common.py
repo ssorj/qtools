@@ -67,9 +67,9 @@ class Command(object):
         self.parser.add_argument("--init-only", action="store_true",
                                  help=_argparse.SUPPRESS)
         self.parser.add_argument("--quiet", action="store_true",
-                                 help="Print no messages to the console")
+                                 help="Print no logging to the console")
         self.parser.add_argument("--verbose", action="store_true",
-                                 help="Print details to the console")
+                                 help="Print detailed logging to the console")
 
     def init(self):
         assert self.parser is not None
