@@ -40,10 +40,10 @@ class SendCommand(Command):
         self.parser.description = _description
 
         self.parser.add_argument("url", metavar="ADDRESS-URL",
-                                 help="The location of a message queue")
+                                 help="The location of a queue or topic")
         self.parser.add_argument("message", metavar="MESSAGE", nargs="*",
                                  help="The message content")
-        self.parser.add_argument("--interactive", action="store_true",
+        self.parser.add_argument("--prompt", action="store_true",
                                  help="Prompt for messages on the console")
 
         self.add_common_arguments()
@@ -62,22 +62,16 @@ class SendCommand(Command):
 
         self.url = self.args.url
         self.command_line_messages = self.args.message
-        self.interactive = self.args.interactive
+        self.prompt = self.args.prompt
 
         for message in self.command_line_messages:
             pmessage = _proton.Message(unicode(message))
             self.messages.appendleft(pmessage)
 
-        if self.interactive:
-            self.quiet = True
-        else:
+        if not self.prompt:
             self.messages.appendleft(None)
 
     def run(self):
-        if self.interactive:
-            self.container.selectable(self.events)
-            self.console_input_thread.start()
-
         self.container.run()
 
 class _ConsoleInputThread(_threading.Thread):
@@ -119,7 +113,22 @@ class _SendHandler(_handlers.MessagingHandler):
         self.connection = event.container.connect(domain, allowed_mechs=b"ANONYMOUS")
         self.sender = event.container.create_sender(self.connection, path)
 
-        self.command.notice("Created sender for target address '{}'", path)
+    def on_connection_opened(self, event):
+        # XXX "is" checks fail here
+        assert event.connection == self.connection
+
+        # XXX Connected to what?  Transport doesn't have what I need.
+        self.command.notice("Connected")
+
+    def on_link_opened(self, event):
+        # XXX "is" checks fail here
+        assert event.link == self.sender
+
+        self.command.notice("Created sender for target address '{}'", event.link.target.address)
+
+        if self.command.prompt:
+            self.command.container.selectable(self.command.events)
+            self.command.console_input_thread.start()
 
     def on_sendable(self, event):
         self.send_message()
@@ -154,7 +163,8 @@ class _SendHandler(_handlers.MessagingHandler):
 
         self.sender.send(message)
 
-        self.command.notice("Sent message '{}'", message.body)
+        if not self.command.prompt:
+            self.command.notice("Sent message '{}'", message.body)
 
     def close(self):
         self.connection.close()

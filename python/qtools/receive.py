@@ -37,7 +37,8 @@ class ReceiveCommand(Command):
 
         self.parser.description = _description
 
-        self.parser.add_argument("address", metavar="ADDRESS-URL")
+        self.parser.add_argument("url", metavar="ADDRESS-URL",
+                                 help="The location of a queue or topic")
         self.parser.add_argument("-m", "--messages", metavar="COUNT",
                                  type=int, default=1)
         self.parser.add_argument("--forever", action="store_true")
@@ -47,9 +48,9 @@ class ReceiveCommand(Command):
     def init(self):
         super(ReceiveCommand, self).init()
 
-        self.address = self.args.address
+        self.url = self.args.url
         self.messages = self.args.messages
-        
+
         self.init_common_attributes()
 
     def run(self):
@@ -63,23 +64,36 @@ class _ReceiveHandler(_handlers.MessagingHandler):
         super(_ReceiveHandler, self).__init__()
 
         self.command = command
-
+        self.connection = None
+        self.receiver = None
         self.count = 0
 
     def on_start(self, event):
-        host, port, path = parse_address_url(self.command.address)
+        host, port, path = parse_address_url(self.command.url)
         domain = "{}:{}".format(host, port)
 
-        conn = event.container.connect(domain, allowed_mechs=b"ANONYMOUS")
-        event.container.create_receiver(conn, path)
+        self.connection = event.container.connect(domain, allowed_mechs=b"ANONYMOUS")
+        self.receiver = event.container.create_receiver(self.connection, path)
 
-        self.command.notice("Created receiver for source address '{}'", path)
+    def on_connection_opened(self, event):
+        # XXX "is" checks fail here
+        assert event.connection == self.connection
+
+        # XXX Connected to what?  Transport doesn't have what I need.
+        self.command.notice("Connected")
+
+    def on_link_opened(self, event):
+        # XXX "is" checks fail here
+        assert event.link == self.sender
+
+        self.command.notice("Created receiver for source address '{}'", event.link.source.address)
 
     def on_message(self, event):
         if self.count == self.command.messages:
             return
 
-        self.command.notice("Received message '{}'", event.message.body)
+        if self.command.verbose:
+            self.command.notice("Received message '{}'", event.message.body)
 
         print(event.message.body)
 
