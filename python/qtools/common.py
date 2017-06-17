@@ -64,9 +64,12 @@ class Command(object):
         return _pencil.format_repr(self)
 
     def add_common_arguments(self):
-        self.parser.add_argument("--init-only", action="store_true")
-        self.parser.add_argument("--quiet", action="store_true")
-        self.parser.add_argument("--verbose", action="store_true")
+        self.parser.add_argument("--init-only", action="store_true",
+                                 help=_argparse.SUPPRESS)
+        self.parser.add_argument("--quiet", action="store_true",
+                                 help="Print nothing to the console")
+        self.parser.add_argument("--verbose", action="store_true",
+                                 help="Print details to the console")
 
     def init(self):
         assert self.parser is not None
