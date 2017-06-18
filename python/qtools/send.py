@@ -69,7 +69,6 @@ class SendCommand(Command):
             self.input_file = open(self.args.input, "r")
 
         for value in self.args.message:
-            # XXX Move this to the handler so it runs after link setup?
             message = _proton.Message(unicode(value))
             self.send_input(message)
 
