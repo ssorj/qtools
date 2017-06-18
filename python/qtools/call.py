@@ -87,24 +87,22 @@ class _CallHandler(LinkHandler):
     def __init__(self, command):
         super(_CallHandler, self).__init__(command)
 
-        self.stop_requested = False
-
         self.senders = _collections.deque()
         self.receivers_by_sender = dict()
 
         self.sent_requests = 0
         self.settled_requests = 0
         self.received_responses = 0
+        self.stop_requested = False
 
-    def open_link(self, event, connection, address):
+    def open_links(self, event, connection, address):
         sender = event.container.create_sender(connection, address)
         receiver = event.container.create_receiver(connection, None, dynamic=True)
 
         self.senders.appendleft(sender)
         self.receivers_by_sender[sender] = receiver
-        self.links.appendleft(receiver)
 
-        return sender
+        return sender, receiver
 
     def on_sendable(self, event):
         self.send_request(event)
@@ -127,8 +125,6 @@ class _CallHandler(LinkHandler):
             self.close()
 
     def send_request(self, event):
-        print("send_request", self.stop_requested, self.command.ready.is_set())
-
         if self.stop_requested:
             return
 

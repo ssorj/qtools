@@ -180,8 +180,8 @@ class LinkHandler(_handlers.MessagingHandler):
 
         self.command = command
 
-        self.connections = _collections.deque()
-        self.links = _collections.deque()
+        self.connections = list()
+        self.links = list()
 
         self.opened_links = 0
 
@@ -191,12 +191,12 @@ class LinkHandler(_handlers.MessagingHandler):
             domain = "{}:{}".format(host, port)
 
             connection = event.container.connect(domain, allowed_mechs=b"ANONYMOUS")
-            link = self.open_link(event, connection, address)
+            links = self.open_links(event, connection, address)
 
-            self.connections.appendleft(connection)
-            self.links.appendleft(link)
+            self.connections.append(connection)
+            self.links.extend(links)
 
-    def open_link(self, connection):
+    def open_links(self, connection):
         raise NotImplementedError()
 
     def on_connection_opened(self, event):
@@ -212,8 +212,6 @@ class LinkHandler(_handlers.MessagingHandler):
         self.opened_links += 1
 
         if event.link.is_receiver:
-            # XXX assert event.link in self.receivers
-
             self.command.notice("Created receiver for source address '{}' on container '{}'",
                                 event.link.source.address,
                                 event.connection.remote_container)

@@ -88,13 +88,14 @@ class _SendHandler(LinkHandler):
     def __init__(self, command):
         super(_SendHandler, self).__init__(command)
 
-        self.stop_requested = False
+        self.senders = _collections.deque()
 
         self.sent_messages = 0
         self.settled_messages = 0
+        self.stop_requested = False
 
-    def open_link(self, event, connection, address):
-        return event.container.create_sender(connection, address)
+    def open_links(self, event, connection, address):
+        return event.container.create_sender(connection, address),
 
     def on_sendable(self, event):
         self.send_message(event)
@@ -135,8 +136,8 @@ class _SendHandler(LinkHandler):
         sender = event.link
 
         if sender is None:
-            sender = self.links.pop()
-            self.links.appendleft(sender)
+            sender = self.senders.pop()
+            self.senders.appendleft(sender)
 
         if not sender.credit:
             self.command.messages.append(message)
