@@ -23,9 +23,10 @@ from __future__ import print_function
 from __future__ import unicode_literals
 from __future__ import with_statement
 
+import collections as _collections
 import proton as _proton
-import proton.handlers as _handlers
 import proton.reactor as _reactor
+import sys as _sys
 
 from .common import *
 
@@ -37,55 +38,136 @@ class CallCommand(Command):
 
         self.parser.description = _description
 
-        self.parser.add_argument("address", metavar="ADDRESS-URL")
-        self.parser.add_argument("body", metavar="MESSAGE-BODY", nargs="?")
+        self.add_link_arguments()
+
+        self.parser.add_argument("-r", "--request", metavar="REQUEST",
+                                 action="append", default=list(),
+                                 help="A string containing the request content")
+        self.parser.add_argument("-i", "--input", metavar="FILE",
+                                 help="Read requests from FILE")
 
         self.add_common_arguments()
+
+        self.container = _reactor.Container(_CallHandler(self))
+        self.events = _reactor.EventInjector()
+        self.requests = _collections.deque()
+        self.input_thread = InputThread(self)
+
+        self.container.selectable(self.events)
 
     def init(self):
         super(CallCommand, self).init()
 
-        self.address = self.args.address
-        self.body = self.args.body
-
+        self.init_link_attributes()
         self.init_common_attributes()
 
+        self.input_file = _sys.stdin
+
+        if self.args.input is not None:
+            self.input_file = open(self.args.input, "r")
+
+        for value in self.args.request:
+            message = _proton.Message(unicode(value))
+            self.send_input(message)
+
+        if self.requests:
+            self.send_input(None)
+
+        self.container.container_id = self.id
+
+    def send_input(self, message):
+        self.requests.appendleft(message)
+        self.events.trigger(_reactor.ApplicationEvent("input"))
+
     def run(self):
-        handler = _CallHandler(self)
-        container = _reactor.Container(handler)
+        self.input_thread.start()
+        self.container.run()
 
-        container.run()
-
-class _CallHandler(_handlers.MessagingHandler):
+class _CallHandler(LinkHandler):
     def __init__(self, command):
-        super(_CallHandler, self).__init__()
+        super(_CallHandler, self).__init__(command)
 
-        self.command = command
+        self.stop_requested = False
 
-        self.sender = None
-        self.receiver = None
+        self.senders = _collections.deque()
+        self.receivers_by_sender = dict()
 
-    def on_start(self, event):
-        host, port, path = parse_address_url(self.command.address)
-        domain = "{}:{}".format(host, port)
+        self.sent_requests = 0
+        self.settled_requests = 0
+        self.received_responses = 0
 
-        conn = event.container.connect(domain, allowed_mechs=b"ANONYMOUS")
+    def open_link(self, event, connection, address):
+        sender = event.container.create_sender(connection, address)
+        receiver = event.container.create_receiver(connection, None, dynamic=True)
 
-        self.sender = event.container.create_sender(conn, path)
-        self.command.notice("Created sender for target address '{}'", path)
+        self.senders.appendleft(sender)
+        self.receivers_by_sender[sender] = receiver
+        self.links.appendleft(receiver)
 
-        self.receiver = event.container.create_receiver(conn, None, dynamic=True)
-        self.command.notice("Created dynamic receiver for responses")
+        return sender
 
-    def on_link_opened(self, event):
-        if event.receiver == self.receiver:
-            request = _proton.Message(unicode(self.command.body))
-            request.reply_to = self.receiver.remote_source.address
+    def on_sendable(self, event):
+        self.send_request(event)
 
-            self.sender.send(request)
+    def on_input(self, event):
+        self.send_request(event)
 
-            self.command.notice("Sent request '{}'", self.command.body)
+    def on_settled(self, event):
+        self.settled_requests += 1
+
+        if self.stop_requested and self.sent_requests == self.received_responses:
+            self.close()
 
     def on_message(self, event):
+        self.received_responses += 1
+
         self.command.notice("Received response '{}'", event.message.body)
-        event.connection.close()        
+
+        if self.stop_requested and self.sent_requests == self.received_responses:
+            self.close()
+
+    def send_request(self, event):
+        print("send_request", self.stop_requested, self.command.ready.is_set())
+
+        if self.stop_requested:
+            return
+
+        if not self.command.ready.is_set():
+            return
+
+        try:
+            request = self.command.requests.pop()
+        except IndexError:
+            return
+
+        if request is None:
+            if self.sent_requests == self.received_responses:
+                self.close()
+            else:
+                self.stop_requested = True
+
+            return
+
+        sender = event.link
+
+        if sender is None:
+            sender = self.senders.pop()
+            self.senders.appendleft(sender)
+
+        if not sender.credit:
+            self.command.requests.append(message)
+            return
+
+        receiver = self.receivers_by_sender[sender]
+        request.reply_to = receiver.remote_source.address
+
+        delivery = sender.send(request)
+
+        self.sent_requests += 1
+
+        if self.command.verbose:
+            self.command.notice("Sent request '{}' as delivery '{}' to '{}' on '{}'",
+                                request.body,
+                                delivery.tag,
+                                sender.target.address,
+                                sender.connection.remote_container)

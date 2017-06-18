@@ -38,8 +38,8 @@ class ProcessCommand(Command):
 
         self.parser.description = _description
 
-        self.parser.add_argument("url", metavar="ADDRESS-URL", nargs="+",
-                                 help="The location of a message source")
+        self.add_link_arguments()
+
         #self.parser.add_argument("--max", metavar="COUNT", type=int,
         #                         help="Stop after receiving COUNT messages")
 
@@ -60,52 +60,25 @@ class ProcessCommand(Command):
     def run(self):
         self.container.run()
 
-class _ProcessHandler(_handlers.MessagingHandler):
+class _ProcessHandler(LinkHandler):
     def __init__(self, command):
-        super(_ProcessHandler, self).__init__()
+        super(_ProcessHandler, self).__init__(command)
 
-        self.command = command
-        self.connections = set()
-        self.receivers = set()
+        self.receivers = list()
         self.senders_by_receiver = dict()
 
         self.received_requests = 0
         self.processed_requests = 0
 
-    def on_start(self, event):
-        for url in self.command.urls:
-            host, port, path = parse_address_url(url)
-            domain = "{}:{}".format(host, port)
+    def open_link(self, event, connection, address):
+        receiver = event.container.create_receiver(connection, address)
+        sender = event.container.create_sender(connection, None)
 
-            connection = event.container.connect(domain, allowed_mechs=b"ANONYMOUS")
-            receiver = event.container.create_receiver(connection, path)
-            sender = event.container.create_sender(connection, None)
+        self.receivers.append(receiver)
+        self.senders_by_receiver[receiver] = sender
+        self.links.appendleft(sender)
 
-            self.connections.add(connection)
-            self.receivers.add(receiver)
-            self.senders_by_receiver[receiver] = sender
-
-    def on_connection_opened(self, event):
-        assert event.connection in self.connections
-
-        if self.command.verbose:
-            self.command.notice("Connected to container '{}'",
-                                event.connection.remote_container)
-
-    def on_link_opened(self, event):
-        if event.link.is_receiver:
-            assert event.link in self.receivers
-
-            self.command.notice("Created receiver for source address '{}' on container '{}'",
-                                event.link.source.address,
-                                event.connection.remote_container)
-
-        if event.link.is_sender:
-            assert event.link in self.senders_by_receiver.values()
-
-            self.command.notice("Created sender for target address '{}' on container '{}'",
-                                event.link.target.address,
-                                event.connection.remote_container)
+        return receiver
 
     def on_message(self, event):
         #if self.received_requests == self.command.max_count:
@@ -115,7 +88,7 @@ class _ProcessHandler(_handlers.MessagingHandler):
 
         request = event.message
         receiver = event.link
-        
+
         if self.command.verbose:
             self.command.notice("Received request '{}' from '{}' on '{}'",
                                 request.body,
@@ -140,7 +113,3 @@ class _ProcessHandler(_handlers.MessagingHandler):
         response = _proton.Message(response_body)
 
         return response
-            
-    def close(self):
-        for connection in self.connections:
-            connection.close()

@@ -57,6 +57,7 @@ devel: install
 	qsend --help > /dev/null
 	qreceive --help > /dev/null
 	qcall --help > /dev/null
+	qprocess --help > /dev/null
 #	qdrain --help > /dev/null
 #	qping --help > /dev/null
 

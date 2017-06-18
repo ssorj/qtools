@@ -24,7 +24,6 @@ from __future__ import unicode_literals
 from __future__ import with_statement
 
 import proton as _proton
-import proton.handlers as _handlers
 import proton.reactor as _reactor
 import sys as _sys
 
@@ -38,8 +37,8 @@ class ReceiveCommand(Command):
 
         self.parser.description = _description
 
-        self.parser.add_argument("url", metavar="ADDRESS-URL", nargs="+",
-                                 help="The location of a message source")
+        self.add_link_arguments()
+
         self.parser.add_argument("-o", "--output", metavar="FILE",
                                  help="Write message content to FILE")
         self.parser.add_argument("--max", metavar="COUNT", type=int,
@@ -66,40 +65,14 @@ class ReceiveCommand(Command):
     def run(self):
         self.container.run()
 
-class _ReceiveHandler(_handlers.MessagingHandler):
+class _ReceiveHandler(LinkHandler):
     def __init__(self, command):
-        super(_ReceiveHandler, self).__init__()
-
-        self.command = command
-        self.connections = set()
-        self.receivers = set()
+        super(_ReceiveHandler, self).__init__(command)
 
         self.received_messages = 0
 
-    def on_start(self, event):
-        for url in self.command.urls:
-            host, port, path = parse_address_url(url)
-            domain = "{}:{}".format(host, port)
-
-            connection = event.container.connect(domain, allowed_mechs=b"ANONYMOUS")
-            receiver = event.container.create_receiver(connection, path)
-
-            self.connections.add(connection)
-            self.receivers.add(receiver)
-
-    def on_connection_opened(self, event):
-        assert event.connection in self.connections
-
-        if self.command.verbose:
-            self.command.notice("Connected to container '{}'",
-                                event.connection.remote_container)
-
-    def on_link_opened(self, event):
-        assert event.link in self.receivers
-
-        self.command.notice("Created receiver for source address '{}' on container '{}'",
-                            event.link.source.address,
-                            event.connection.remote_container)
+    def open_link(self, event, connection, address):
+        return event.container.create_receiver(connection, address)
 
     def on_message(self, event):
         if self.received_messages == self.command.max_count:
@@ -118,7 +91,3 @@ class _ReceiveHandler(_handlers.MessagingHandler):
 
         if self.received_messages == self.command.max_count:
             self.close()
-
-    def close(self):
-        for connection in self.connections:
-            connection.close()

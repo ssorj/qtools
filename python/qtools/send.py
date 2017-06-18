@@ -25,7 +25,6 @@ from __future__ import with_statement
 
 import collections as _collections
 import proton as _proton
-import proton.handlers as _handlers
 import proton.reactor as _reactor
 import sys as _sys
 import threading as _threading
@@ -40,29 +39,29 @@ class SendCommand(Command):
 
         self.parser.description = _description
 
-        self.parser.add_argument("url", metavar="ADDRESS-URL", nargs="+",
-                                 help="The location of a message target")
+        self.add_link_arguments()
+
         self.parser.add_argument("-m", "--message", metavar="MESSAGE",
                                  action="append", default=list(),
-                                 help="A string containing message content")
+                                 help="A string containing the message content")
         self.parser.add_argument("-i", "--input", metavar="FILE",
-                                 help="Read message content from FILE")
+                                 help="Read messages from FILE")
 
         self.add_common_arguments()
 
         self.container = _reactor.Container(_SendHandler(self))
         self.events = _reactor.EventInjector()
         self.messages = _collections.deque()
-        self.ready = _threading.Event()
-        self.input_thread = _InputThread(self)
+        self.input_thread = InputThread(self)
+
         self.container.selectable(self.events)
 
     def init(self):
         super(SendCommand, self).init()
 
+        self.init_link_attributes()
         self.init_common_attributes()
 
-        self.urls = self.args.url
         self.input_file = _sys.stdin
 
         if self.args.input is not None:
@@ -85,71 +84,17 @@ class SendCommand(Command):
         self.input_thread.start()
         self.container.run()
 
-class _InputThread(_threading.Thread):
+class _SendHandler(LinkHandler):
     def __init__(self, command):
-        _threading.Thread.__init__(self)
+        super(_SendHandler, self).__init__(command)
 
-        self.command = command
-        self.daemon = True
-
-    def run(self):
-        self.command.ready.wait()
-
-        with self.command.input_file as f:
-            while True:
-                body = f.readline()
-
-                if body == "":
-                    self.command.send_input(None)
-                    break
-
-                body = unicode(body[:-1])
-                message = _proton.Message(body)
-
-                self.command.send_input(message)
-
-class _SendHandler(_handlers.MessagingHandler):
-    def __init__(self, command):
-        super(_SendHandler, self).__init__()
-
-        self.command = command
-        self.connections = set()
-        self.senders = _collections.deque()
         self.stop_requested = False
 
-        self.opened_senders = 0
         self.sent_messages = 0
         self.settled_messages = 0
 
-    def on_start(self, event):
-        for url in self.command.urls:
-            host, port, path = parse_address_url(url)
-            domain = "{}:{}".format(host, port)
-
-            connection = event.container.connect(domain, allowed_mechs=b"ANONYMOUS")
-            sender = event.container.create_sender(connection, path)
-
-            self.connections.add(connection)
-            self.senders.appendleft(sender)
-
-    def on_connection_opened(self, event):
-        assert event.connection in self.connections
-
-        if self.command.verbose:
-            self.command.notice("Connected to container '{}'",
-                                event.connection.remote_container)
-
-    def on_link_opened(self, event):
-        assert event.link in self.senders
-
-        self.command.notice("Created sender for target address '{}' on container '{}'",
-                            event.link.target.address,
-                            event.connection.remote_container)
-
-        self.opened_senders += 1
-
-        if self.opened_senders == len(self.senders):
-            self.command.ready.set()
+    def open_link(self, event, connection, address):
+        return event.container.create_sender(connection, address)
 
     def on_sendable(self, event):
         self.send_message(event)
@@ -190,8 +135,8 @@ class _SendHandler(_handlers.MessagingHandler):
         sender = event.link
 
         if sender is None:
-            sender = self.senders.pop()
-            self.senders.appendleft(sender)
+            sender = self.links.pop()
+            self.links.appendleft(sender)
 
         if not sender.credit:
             self.command.messages.append(message)
@@ -207,9 +152,3 @@ class _SendHandler(_handlers.MessagingHandler):
                                 delivery.tag,
                                 sender.target.address,
                                 sender.connection.remote_container)
-
-    def close(self):
-        for connection in self.connections:
-            connection.close()
-
-        self.command.events.close()

@@ -25,9 +25,12 @@ from __future__ import with_statement
 
 import argparse as _argparse
 import binascii as _binascii
+import collections as _collections
 import pencil as _pencil
 import proton as _proton
+import proton.handlers as _handlers
 import sys as _sys
+import threading as _threading
 import uuid as _uuid
 
 try:
@@ -51,9 +54,9 @@ class Command(object):
         self.parser = _argparse.ArgumentParser()
         self.parser.formatter_class = _Formatter
 
-        self.init_only = False
         self.quiet = False
         self.verbose = False
+        self.init_only = False
 
         for arg in _sys.argv:
             if "=" not in arg:
@@ -62,8 +65,15 @@ class Command(object):
 
         self.args = None
 
+        self.ready = _threading.Event()
+        self.done = _threading.Event()
+
     def __repr__(self):
         return _pencil.format_repr(self)
+
+    def add_link_arguments(self):
+        self.parser.add_argument("url", metavar="ADDRESS-URL", nargs="+",
+                                 help="The location of a message source or target")
 
     def add_common_arguments(self):
         self.parser.add_argument("--id", metavar="ID",
@@ -81,6 +91,9 @@ class Command(object):
 
         self.args = self.parser.parse_args()
 
+    def init_link_attributes(self):
+        self.urls = self.args.url
+
     def init_common_attributes(self):
         self.id = self.args.id
         self.quiet = self.args.quiet
@@ -92,6 +105,9 @@ class Command(object):
             hex_ = _binascii.hexlify(bytes_).decode("utf-8")
 
             self.id = "{}-{}".format(self.name, hex_)
+
+    def send_input(self, message):
+        raise NotImplementedError()
 
     def run(self):
         raise NotImplementedError()
@@ -131,6 +147,92 @@ class Command(object):
 
         _sys.stderr.write("{}\n".format(message))
         _sys.stderr.flush()
+
+class InputThread(_threading.Thread):
+    def __init__(self, command):
+        _threading.Thread.__init__(self)
+
+        self.command = command
+        self.daemon = True
+
+    def run(self):
+        self.command.ready.wait()
+
+        with self.command.input_file as f:
+            while True:
+                if self.command.done.is_set():
+                    break
+
+                body = f.readline()
+
+                if body == "":
+                    self.command.send_input(None)
+                    break
+
+                body = unicode(body[:-1])
+                message = _proton.Message(body)
+
+                self.command.send_input(message)
+
+class LinkHandler(_handlers.MessagingHandler):
+    def __init__(self, command):
+        super(LinkHandler, self).__init__()
+
+        self.command = command
+
+        self.connections = _collections.deque()
+        self.links = _collections.deque()
+
+        self.opened_links = 0
+
+    def on_start(self, event):
+        for url in self.command.urls:
+            host, port, address = parse_address_url(url)
+            domain = "{}:{}".format(host, port)
+
+            connection = event.container.connect(domain, allowed_mechs=b"ANONYMOUS")
+            link = self.open_link(event, connection, address)
+
+            self.connections.appendleft(connection)
+            self.links.appendleft(link)
+
+    def open_link(self, connection):
+        raise NotImplementedError()
+
+    def on_connection_opened(self, event):
+        assert event.connection in self.connections
+
+        if self.command.verbose:
+            self.command.notice("Connected to container '{}'",
+                                event.connection.remote_container)
+
+    def on_link_opened(self, event):
+        assert event.link in self.links
+
+        self.opened_links += 1
+
+        if event.link.is_receiver:
+            # XXX assert event.link in self.receivers
+
+            self.command.notice("Created receiver for source address '{}' on container '{}'",
+                                event.link.source.address,
+                                event.connection.remote_container)
+
+        if event.link.is_sender:
+            self.command.notice("Created sender for target address '{}' on container '{}'",
+                                event.link.target.address,
+                                event.connection.remote_container)
+
+        if self.opened_links == len(self.links):
+            self.command.ready.set()
+
+    def close(self):
+        self.command.done.set()
+
+        for connection in self.connections:
+            connection.close()
+
+        self.command.events.close()
 
 def parse_address_url(address):
     url = _urlparse(address)
