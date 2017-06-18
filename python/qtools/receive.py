@@ -71,8 +71,8 @@ class _ReceiveHandler(LinkHandler):
 
         self.received_messages = 0
 
-    def open_link(self, event, connection, address):
-        return event.container.create_receiver(connection, address)
+    def open_links(self, event, connection, address):
+        return event.container.create_receiver(connection, address),
 
     def on_message(self, event):
         if self.received_messages == self.command.max_count:

@@ -70,15 +70,14 @@ class _ProcessHandler(LinkHandler):
         self.received_requests = 0
         self.processed_requests = 0
 
-    def open_link(self, event, connection, address):
+    def open_links(self, event, connection, address):
         receiver = event.container.create_receiver(connection, address)
         sender = event.container.create_sender(connection, None)
 
         self.receivers.append(receiver)
         self.senders_by_receiver[receiver] = sender
-        self.links.appendleft(sender)
 
-        return receiver
+        return receiver, sender
 
     def on_message(self, event):
         #if self.received_requests == self.command.max_count:
