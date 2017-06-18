@@ -58,6 +58,7 @@ class BrokerCommand(Command):
         handler = _BrokerHandler(self)
         container = _reactor.Container(handler)
 
+        container.container_id = self.id
         container.run()
 
 class _BrokerQueue(object):
@@ -68,7 +69,7 @@ class _BrokerQueue(object):
         self.messages = _collections.deque()
         self.consumers = list()
 
-        self.command.notice("Creating {}", self)
+        self.command.notice("Created {}", self)
 
     def __repr__(self):
         return "queue '{}'".format(self.address)
@@ -77,22 +78,26 @@ class _BrokerQueue(object):
         assert link.is_sender
         assert link not in self.consumers
 
-        self.command.notice("Adding consumer for '{}' to {}", link.connection.remote_container, self)
-
         self.consumers.append(link)
+
+        self.command.notice("Added consumer for container '{}' to {}",
+                            link.connection.remote_container, self)
 
     def remove_consumer(self, link):
         assert link.is_sender
 
-        self.command.notice("Removing consumer for '{}' from {}", link.connection.remote_container, self)
-
         try:
             self.consumers.remove(link)
         except ValueError:
-            pass
+            return
+
+        self.command.notice("Removed consumer for container '{}' from {}",
+                            link.connection.remote_container, self)
 
     def store_message(self, message):
         self.messages.append(message)
+
+        self.command.notice("Stored message '{}' on {}", message.body, self)
 
     def forward_messages(self, link):
         assert link.is_sender
@@ -104,6 +109,9 @@ class _BrokerQueue(object):
                 break
 
             link.send(message)
+
+            self.command.notice("Forwarded message '{}' to container '{}'",
+                                message.body, link.connection.remote_container)
 
 class _BrokerHandler(_handlers.MessagingHandler):
     def __init__(self, command):
@@ -152,18 +160,23 @@ class _BrokerHandler(_handlers.MessagingHandler):
             queue.remove_consumer(link)
 
     def on_connection_opening(self, event):
-        self.command.notice("Opening connection from '{}'", event.connection.remote_container)
-
         # XXX I think this should happen automatically
         event.connection.container = event.container.container_id
 
-    def on_connection_closing(self, event):
-        self.command.notice("Closing connection from '{}'", event.connection.remote_container)
+    def on_connection_opened(self, event):
+        self.command.notice("Opened connection from container '{}'",
+                            event.connection.remote_container)
 
+    def on_connection_closing(self, event):
         self.remove_consumers(event.connection)
 
+    def on_connection_closed(self, event):
+        self.command.notice("Closed connection from container '{}'",
+                            event.connection.remote_container)
+
     def on_disconnected(self, event):
-        self.command.notice("Disconnected from {}", event.connection.remote_container)
+        self.command.notice("Disconnected from container '{}'",
+                            event.connection.remote_container)
 
         self.remove_consumers(event.connection)
 

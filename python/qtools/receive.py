@@ -45,19 +45,22 @@ class ReceiveCommand(Command):
 
         self.add_common_arguments()
 
+        handler = _ReceiveHandler(self)
+
+        self.container = _reactor.Container(handler)
+
     def init(self):
         super(ReceiveCommand, self).init()
+
+        self.init_common_attributes()
 
         self.urls = self.args.url
         self.max_messages = self.args.messages
 
-        self.init_common_attributes()
+        self.container.container_id = self.id
 
     def run(self):
-        handler = _ReceiveHandler(self)
-        container = _reactor.Container(handler)
-
-        container.run()
+        self.container.run()
 
 class _ReceiveHandler(_handlers.MessagingHandler):
     def __init__(self, command):
@@ -82,8 +85,7 @@ class _ReceiveHandler(_handlers.MessagingHandler):
     def on_connection_opened(self, event):
         assert event.connection in self.connections
 
-        # XXX Connected to what?  Transport doesn't have what I need.
-        self.command.notice("Connected")
+        self.command.notice("Connected to container '{}'", event.connection.remote_container)
 
     def on_link_opened(self, event):
         assert event.link in self.receivers

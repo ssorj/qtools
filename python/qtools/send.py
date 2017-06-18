@@ -79,6 +79,8 @@ class SendCommand(Command):
 
             self.messages.appendleft(None)
 
+        self.container.container_id = self.id
+
     def run(self):
         self.console_input_thread.start()
         self.container.run()
@@ -91,8 +93,6 @@ class _ConsoleInputThread(_threading.Thread):
         self.daemon = True
 
     def run(self):
-        print("Connecting...")
-
         self.command.ready.wait()
 
         print("Ready. Type Ctrl-D to exit.")
@@ -135,8 +135,7 @@ class _SendHandler(_handlers.MessagingHandler):
     def on_connection_opened(self, event):
         assert event.connection in self.connections
 
-        # XXX Connected to what?  Transport doesn't have what I need.
-        self.command.notice("Connected")
+        self.command.notice("Connected to container '{}'", event.connection.remote_container)
 
     def on_link_opened(self, event):
         assert event.link in self.senders
