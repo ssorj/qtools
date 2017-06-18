@@ -48,7 +48,7 @@ class CallCommand(Command):
 
         self.add_common_arguments()
 
-        self.container = _reactor.Container(_CallHandler(self))
+        self.container.handler = _CallHandler(self)
         self.events = _reactor.EventInjector()
         self.requests = _collections.deque()
         self.input_thread = InputThread(self)
@@ -73,15 +73,14 @@ class CallCommand(Command):
         if self.requests:
             self.send_input(None)
 
-        self.container.container_id = self.id
-
     def send_input(self, message):
         self.requests.appendleft(message)
         self.events.trigger(_reactor.ApplicationEvent("input"))
 
     def run(self):
         self.input_thread.start()
-        self.container.run()
+
+        super(CallCommand, self).run()
 
 class _CallHandler(LinkHandler):
     def __init__(self, command):

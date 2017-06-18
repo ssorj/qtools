@@ -46,7 +46,7 @@ class ReceiveCommand(Command):
 
         self.add_common_arguments()
 
-        self.container = _reactor.Container(_ReceiveHandler(self))
+        self.container.handler = _ReceiveHandler(self)
 
     def init(self):
         super(ReceiveCommand, self).init()
@@ -59,11 +59,6 @@ class ReceiveCommand(Command):
 
         if self.args.output is not None:
             self.output_file = open(self.args.output, "w")
-
-        self.container.container_id = self.id
-
-    def run(self):
-        self.container.run()
 
 class _ReceiveHandler(LinkHandler):
     def __init__(self, command):

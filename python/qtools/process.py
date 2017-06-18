@@ -45,20 +45,15 @@ class ProcessCommand(Command):
 
         self.add_common_arguments()
 
-        self.container = _reactor.Container(_ProcessHandler(self))
+        self.container.handler = _ProcessHandler(self)
 
     def init(self):
         super(ProcessCommand, self).init()
 
+        self.init_link_attributes()
         self.init_common_attributes()
 
-        self.urls = self.args.url
         #self.max_count = self.args.max
-
-        self.container.container_id = self.id
-
-    def run(self):
-        self.container.run()
 
 class _ProcessHandler(LinkHandler):
     def __init__(self, command):

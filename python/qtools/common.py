@@ -29,6 +29,7 @@ import collections as _collections
 import pencil as _pencil
 import proton as _proton
 import proton.handlers as _handlers
+import proton.reactor as _reactor
 import sys as _sys
 import threading as _threading
 import uuid as _uuid
@@ -54,6 +55,10 @@ class Command(object):
         self.parser = _argparse.ArgumentParser()
         self.parser.formatter_class = _Formatter
 
+        self.args = None
+
+        self.container = _reactor.Container()
+
         self.quiet = False
         self.verbose = False
         self.init_only = False
@@ -62,8 +67,6 @@ class Command(object):
             if "=" not in arg:
                 self.name = arg.rsplit("/", 1)[-1]
                 break
-
-        self.args = None
 
         self.ready = _threading.Event()
         self.done = _threading.Event()
@@ -106,11 +109,13 @@ class Command(object):
 
             self.id = "{}-{}".format(self.name, hex_)
 
+        self.container.container_id = self.id
+
     def send_input(self, message):
         raise NotImplementedError()
 
     def run(self):
-        raise NotImplementedError()
+        self.container.run()
 
     def main(self):
         try:

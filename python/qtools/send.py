@@ -49,7 +49,7 @@ class SendCommand(Command):
 
         self.add_common_arguments()
 
-        self.container = _reactor.Container(_SendHandler(self))
+        self.container.handler = _SendHandler(self)
         self.events = _reactor.EventInjector()
         self.messages = _collections.deque()
         self.input_thread = InputThread(self)
@@ -74,15 +74,14 @@ class SendCommand(Command):
         if self.messages:
             self.send_input(None)
 
-        self.container.container_id = self.id
-
     def send_input(self, message):
         self.messages.appendleft(message)
         self.events.trigger(_reactor.ApplicationEvent("input"))
 
     def run(self):
         self.input_thread.start()
-        self.container.run()
+
+        super(SendCommand, self).run()
 
 class _SendHandler(LinkHandler):
     def __init__(self, command):
