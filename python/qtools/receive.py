@@ -40,7 +40,7 @@ class ReceiveCommand(Command):
         self.add_link_arguments()
 
         self.parser.add_argument("-o", "--output", metavar="FILE",
-                                 help="Write message content to FILE")
+                                 help="Write messages to FILE")
         self.parser.add_argument("--max", metavar="COUNT", type=int,
                                  help="Stop after receiving COUNT messages")
 
@@ -51,9 +51,9 @@ class ReceiveCommand(Command):
     def init(self):
         super(ReceiveCommand, self).init()
 
+        self.init_link_attributes()
         self.init_common_attributes()
 
-        self.urls = self.args.url
         self.output_file = _sys.stdout
         self.max_count = self.args.max
 
