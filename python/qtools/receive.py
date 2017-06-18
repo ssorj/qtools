@@ -45,9 +45,7 @@ class ReceiveCommand(Command):
 
         self.add_common_arguments()
 
-        handler = _ReceiveHandler(self)
-
-        self.container = _reactor.Container(handler)
+        self.container = _reactor.Container(_ReceiveHandler(self))
 
     def init(self):
         super(ReceiveCommand, self).init()

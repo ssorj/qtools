@@ -27,6 +27,7 @@ import collections as _collections
 import proton as _proton
 import proton.handlers as _handlers
 import proton.reactor as _reactor
+import sys as _sys
 import threading as _threading
 
 from .common import *
@@ -44,19 +45,16 @@ class SendCommand(Command):
         self.parser.add_argument("-m", "--message", metavar="MESSAGE",
                                  action="append", default=list(),
                                  help="A string containing message content")
-        self.parser.add_argument("--prompt", action="store_true",
-                                 help="Prompt for messages on the console")
+        self.parser.add_argument("-i", "--input", metavar="FILE", default="-",
+                                 help="Read message content from FILE; '-' means stdin")
 
         self.add_common_arguments()
 
-        handler = _SendHandler(self)
-
-        self.container = _reactor.Container(handler)
+        self.container = _reactor.Container(_SendHandler(self))
         self.events = _reactor.EventInjector()
         self.messages = _collections.deque()
         self.ready = _threading.Event()
-        self.console_input_thread = _ConsoleInputThread(self)
-
+        self.input_thread = _InputThread(self)
         self.container.selectable(self.events)
 
     def init(self):
@@ -65,27 +63,30 @@ class SendCommand(Command):
         self.init_common_attributes()
 
         self.urls = self.args.url
-        self.prompt = self.args.prompt
+        self.input_file = _sys.stdin
+
+        if self.args.input != "-":
+            self.input_file = open(self.args.input, "r")
 
         for value in self.args.message:
+            # XXX Move this to the handler so it runs after link setup?
             message = _proton.Message(unicode(value))
-            self.messages.appendleft(message)
+            self.send_input(message)
 
-        if self.prompt:
-            self.quiet = True
-        else:
-            if not self.messages:
-                self.parser.error("No message. Use --prompt or --message.")
-
-            self.messages.appendleft(None)
+        if self.messages:
+            self.send_input(None)
 
         self.container.container_id = self.id
 
+    def send_input(self, message):
+        self.messages.appendleft(message)
+        self.events.trigger(_reactor.ApplicationEvent("input"))
+
     def run(self):
-        self.console_input_thread.start()
+        self.input_thread.start()
         self.container.run()
 
-class _ConsoleInputThread(_threading.Thread):
+class _InputThread(_threading.Thread):
     def __init__(self, command):
         _threading.Thread.__init__(self)
 
@@ -95,22 +96,18 @@ class _ConsoleInputThread(_threading.Thread):
     def run(self):
         self.command.ready.wait()
 
-        print("Ready. Type Ctrl-D to exit.")
+        with self.command.input_file as f:
+            while True:
+                body = f.readline()
 
-        while True:
-            try:
-                body = raw_input("> ")
-            except EOFError:
-                self.send_input(None)
-                print()
-                break
+                if body == "":
+                    self.command.send_input(None)
+                    break
 
-            message = _proton.Message(unicode(body))
-            self.send_input(message)
+                body = unicode(body[:-1])
+                message = _proton.Message(body)
 
-    def send_input(self, message):
-        self.command.messages.appendleft(message)
-        self.command.events.trigger(_reactor.ApplicationEvent("input"))
+                self.command.send_input(message)
 
 class _SendHandler(_handlers.MessagingHandler):
     def __init__(self, command):
@@ -120,6 +117,10 @@ class _SendHandler(_handlers.MessagingHandler):
         self.connections = set()
         self.senders = _collections.deque()
         self.stop_requested = False
+
+        self.opened_senders = 0
+        self.sent_messages = 0
+        self.settled_messages = 0
 
     def on_start(self, event):
         for url in self.command.urls:
@@ -135,7 +136,9 @@ class _SendHandler(_handlers.MessagingHandler):
     def on_connection_opened(self, event):
         assert event.connection in self.connections
 
-        self.command.notice("Connected to container '{}'", event.connection.remote_container)
+        if self.command.verbose:
+            self.command.notice("Connected to container '{}'",
+                                event.connection.remote_container)
 
     def on_link_opened(self, event):
         assert event.link in self.senders
@@ -144,7 +147,9 @@ class _SendHandler(_handlers.MessagingHandler):
                             event.link.target.address,
                             event.connection.remote_container)
 
-        if self.command.prompt and len(self.senders) == len(self.command.urls):
+        self.opened_senders += 1
+
+        if self.opened_senders == len(self.senders):
             self.command.ready.set()
 
     def on_sendable(self, event):
@@ -153,17 +158,34 @@ class _SendHandler(_handlers.MessagingHandler):
     def on_input(self, event):
         self.send_message(event)
 
-    def on_accepted(self, event):
-        if self.stop_requested:
+    def on_settled(self, event):
+        self.settled_messages += 1
+
+        if self.command.verbose:
+            self.command.notice("Settled delivery '{}' to '{}'",
+                                event.delivery.tag, event.link.target.address)
+
+        if self.stop_requested and self.sent_messages == self.settled_messages:
             self.close()
 
     def send_message(self, event):
         if self.stop_requested:
             return
 
+        if not self.command.ready.is_set():
+            return
+
         try:
             message = self.command.messages.pop()
         except IndexError:
+            return
+
+        if message is None:
+            if self.sent_messages == self.settled_messages:
+                self.close()
+            else:
+                self.stop_requested = True
+
             return
 
         sender = event.link
@@ -172,24 +194,20 @@ class _SendHandler(_handlers.MessagingHandler):
             sender = self.senders.pop()
             self.senders.appendleft(sender)
 
-        if message is None:
-            if sender.unsettled == 0:
-                self.close()
-            else:
-                self.stop_requested = True
-
-            return
-
         if not sender.credit:
             self.command.messages.append(message)
             return
 
-        sender.send(message)
+        delivery = sender.send(message)
 
-        self.command.notice("Sent message '{}' to '{}' on '{}'",
-                            message.body,
-                            sender.target.address,
-                            sender.connection.remote_container)
+        self.sent_messages += 1
+
+        if self.command.verbose:
+            self.command.notice("Sent message '{}' as delivery '{}' to '{}' on '{}'",
+                                message.body,
+                                delivery.tag,
+                                sender.target.address,
+                                sender.connection.remote_container)
 
     def close(self):
         for connection in self.connections:
