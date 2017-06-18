@@ -45,8 +45,8 @@ class SendCommand(Command):
         self.parser.add_argument("-m", "--message", metavar="MESSAGE",
                                  action="append", default=list(),
                                  help="A string containing message content")
-        self.parser.add_argument("-i", "--input", metavar="FILE", default="-",
-                                 help="Read message content from FILE; '-' means stdin")
+        self.parser.add_argument("-i", "--input", metavar="FILE",
+                                 help="Read message content from FILE")
 
         self.add_common_arguments()
 
@@ -65,7 +65,7 @@ class SendCommand(Command):
         self.urls = self.args.url
         self.input_file = _sys.stdin
 
-        if self.args.input != "-":
+        if self.args.input is not None:
             self.input_file = open(self.args.input, "r")
 
         for value in self.args.message:
