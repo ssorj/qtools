@@ -56,11 +56,12 @@ devel: install
 	qbroker --help > /dev/null
 	qsend --help > /dev/null
 	qreceive --help > /dev/null
-	qcall --help > /dev/null
-	qprocess --help > /dev/null
+	qrequest --help > /dev/null
+	qrespond --help > /dev/null
 #	qdrain --help > /dev/null
 #	qping --help > /dev/null
 
 .PHONY:
 test: devel
-	scripts/smoke-test
+	scripts/test-send-receive
+	scripts/test-request-respond

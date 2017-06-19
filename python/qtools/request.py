@@ -30,11 +30,11 @@ import sys as _sys
 
 from .common import *
 
-_description = "Send an AMQP request and wait for a response"
+_description = "Send AMQP requests"
 
-class CallCommand(Command):
+class RequestCommand(Command):
     def __init__(self, home_dir):
-        super(CallCommand, self).__init__(home_dir)
+        super(RequestCommand, self).__init__(home_dir)
 
         self.parser.description = _description
 
@@ -48,15 +48,13 @@ class CallCommand(Command):
 
         self.add_common_arguments()
 
-        self.container.handler = _CallHandler(self)
-        self.events = _reactor.EventInjector()
+        self.container.handler = _Handler(self)
+
         self.requests = _collections.deque()
         self.input_thread = InputThread(self)
 
-        self.container.selectable(self.events)
-
     def init(self):
-        super(CallCommand, self).init()
+        super(RequestCommand, self).init()
 
         self.init_link_attributes()
         self.init_common_attributes()
@@ -80,11 +78,11 @@ class CallCommand(Command):
     def run(self):
         self.input_thread.start()
 
-        super(CallCommand, self).run()
+        super(RequestCommand, self).run()
 
-class _CallHandler(LinkHandler):
+class _Handler(LinkHandler):
     def __init__(self, command):
-        super(_CallHandler, self).__init__(command)
+        super(_Handler, self).__init__(command)
 
         self.senders = _collections.deque()
         self.receivers_by_sender = dict()

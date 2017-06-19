@@ -30,11 +30,11 @@ import sys as _sys
 
 from .common import *
 
-_description = "Process AMQP requests"
+_description = "Respond to AMQP requests"
 
-class ProcessCommand(Command):
+class RespondCommand(Command):
     def __init__(self, home_dir):
-        super(ProcessCommand, self).__init__(home_dir)
+        super(RespondCommand, self).__init__(home_dir)
 
         self.parser.description = _description
 
@@ -45,25 +45,25 @@ class ProcessCommand(Command):
 
         self.add_common_arguments()
 
-        self.container.handler = _ProcessHandler(self)
+        self.container.handler = _Handler(self)
 
     def init(self):
-        super(ProcessCommand, self).init()
+        super(RespondCommand, self).init()
 
         self.init_link_attributes()
         self.init_common_attributes()
 
         #self.max_count = self.args.max
 
-class _ProcessHandler(LinkHandler):
+class _Handler(LinkHandler):
     def __init__(self, command):
-        super(_ProcessHandler, self).__init__(command)
+        super(_Handler, self).__init__(command)
 
         self.receivers = list()
         self.senders_by_receiver = dict()
 
         self.received_requests = 0
-        self.processed_requests = 0
+        self.sent_responses = 0
 
     def open_links(self, event, connection, address):
         receiver = event.container.create_receiver(connection, address)
@@ -102,6 +102,8 @@ class _ProcessHandler(LinkHandler):
                                 response.address,
                                 event.connection.remote_container)
 
+        self.sent_responses += 1
+            
     def process(self, receiver, request):
         response_body = request.body.upper()
         response = _proton.Message(response_body)

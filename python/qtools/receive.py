@@ -46,7 +46,7 @@ class ReceiveCommand(Command):
 
         self.add_common_arguments()
 
-        self.container.handler = _ReceiveHandler(self)
+        self.container.handler = _Handler(self)
 
     def init(self):
         super(ReceiveCommand, self).init()
@@ -60,9 +60,9 @@ class ReceiveCommand(Command):
         if self.args.output is not None:
             self.output_file = open(self.args.output, "w")
 
-class _ReceiveHandler(LinkHandler):
+class _Handler(LinkHandler):
     def __init__(self, command):
-        super(_ReceiveHandler, self).__init__(command)
+        super(_Handler, self).__init__(command)
 
         self.received_messages = 0
 

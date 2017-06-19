@@ -49,12 +49,10 @@ class SendCommand(Command):
 
         self.add_common_arguments()
 
-        self.container.handler = _SendHandler(self)
-        self.events = _reactor.EventInjector()
+        self.container.handler = _Handler(self)
+        
         self.messages = _collections.deque()
         self.input_thread = InputThread(self)
-
-        self.container.selectable(self.events)
 
     def init(self):
         super(SendCommand, self).init()
@@ -83,9 +81,9 @@ class SendCommand(Command):
 
         super(SendCommand, self).run()
 
-class _SendHandler(LinkHandler):
+class _Handler(LinkHandler):
     def __init__(self, command):
-        super(_SendHandler, self).__init__(command)
+        super(_Handler, self).__init__(command)
 
         self.senders = _collections.deque()
 

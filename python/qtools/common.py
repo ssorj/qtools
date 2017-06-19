@@ -58,6 +58,9 @@ class Command(object):
         self.args = None
 
         self.container = _reactor.Container()
+        self.events = _reactor.EventInjector()
+
+        self.container.selectable(self.events)
 
         self.quiet = False
         self.verbose = False

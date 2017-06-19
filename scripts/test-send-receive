@@ -22,23 +22,23 @@
 set -e
 
 sent_message=$RANDOM
-host=localhost
+host=127.0.0.1
 port=56720
-address=//$host:$port/q0
+url=//$host:$port/q0
 
-qbroker --host $host --port $port &
+qbroker --verbose --host $host --port $port &
 broker_pid=$!
 
 trap "kill $broker_pid" EXIT
 
 sleep 0.2
 
-qsend --verbose $address $sent_message
-received_message=$(qreceive $address)
-
-echo "smoke-test: PASSED"
+qsend --verbose $url -m $sent_message
+received_message=$(qreceive --verbose $url --max 1)
 
 if [[ $sent_message != $received_message ]]; then
     echo "smoke-test: FAILED"
     exit 1
 fi
+
+echo "$0: PASSED"
