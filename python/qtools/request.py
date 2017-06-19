@@ -148,7 +148,7 @@ class _Handler(LinkHandler):
             self.senders.appendleft(sender)
 
         if not sender.credit:
-            self.command.requests.append(message)
+            self.command.requests.append(request)
             return
 
         receiver = self.receivers_by_sender[sender]
