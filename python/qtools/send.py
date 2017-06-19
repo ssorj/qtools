@@ -50,7 +50,7 @@ class SendCommand(Command):
         self.add_common_arguments()
 
         self.container.handler = _Handler(self)
-        
+
         self.messages = _collections.deque()
         self.input_thread = InputThread(self)
 
@@ -139,6 +139,9 @@ class _Handler(LinkHandler):
         if not sender.credit:
             self.command.messages.append(message)
             return
+
+        if message.address is None:
+            message.address = sender.target.address
 
         delivery = sender.send(message)
 

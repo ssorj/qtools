@@ -154,6 +154,9 @@ class _Handler(LinkHandler):
         receiver = self.receivers_by_sender[sender]
         request.reply_to = receiver.remote_source.address
 
+        if request.address is None:
+            request.address = sender.target.address
+
         delivery = sender.send(request)
 
         self.sent_requests += 1
