@@ -25,8 +25,6 @@ from __future__ import with_statement
 
 import argparse as _argparse
 import binascii as _binascii
-import collections as _collections
-import pencil as _pencil
 import proton as _proton
 import proton.handlers as _handlers
 import proton.reactor as _reactor
@@ -73,9 +71,6 @@ class Command(object):
 
         self.ready = _threading.Event()
         self.done = _threading.Event()
-
-    def __repr__(self):
-        return _pencil.format_repr(self)
 
     def add_link_arguments(self):
         self.parser.add_argument("url", metavar="ADDRESS-URL", nargs="+",
