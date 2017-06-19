@@ -92,7 +92,11 @@ class _Handler(LinkHandler):
         self.stop_requested = False
 
     def open_links(self, event, connection, address):
-        return event.container.create_sender(connection, address),
+        sender = event.container.create_sender(connection, address)
+
+        self.senders.appendleft(sender)
+
+        return sender,
 
     def on_sendable(self, event):
         self.send_message(event)
