@@ -40,8 +40,8 @@ class RespondCommand(Command):
 
         self.add_link_arguments()
 
-        #self.parser.add_argument("--max", metavar="COUNT", type=int,
-        #                         help="Stop after receiving COUNT messages")
+        self.parser.add_argument("--max", metavar="COUNT", type=int,
+                                 help="Stop after responding to COUNT requests")
 
         self.add_common_arguments()
 
@@ -53,7 +53,7 @@ class RespondCommand(Command):
         self.init_link_attributes()
         self.init_common_attributes()
 
-        #self.max_count = self.args.max
+        self.max_count = self.args.max
 
 class _Handler(LinkHandler):
     def __init__(self, command):
@@ -62,7 +62,6 @@ class _Handler(LinkHandler):
         self.receivers = list()
         self.senders_by_receiver = dict()
 
-        self.received_requests = 0
         self.sent_responses = 0
 
     def open_links(self, event, connection, address):
@@ -75,10 +74,8 @@ class _Handler(LinkHandler):
         return receiver, sender
 
     def on_message(self, event):
-        #if self.received_requests == self.command.max_count:
-        #    return
-
-        self.received_requests += 1
+        if self.sent_responses == self.command.max_count:
+            return
 
         request = event.message
         receiver = event.link
@@ -103,6 +100,9 @@ class _Handler(LinkHandler):
                                 event.connection.remote_container)
 
         self.sent_responses += 1
+
+        if self.sent_responses == self.command.max_count:
+            self.close()
             
     def process(self, receiver, request):
         response_body = request.body.upper()
