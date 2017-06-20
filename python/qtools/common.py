@@ -37,6 +37,15 @@ try:
 except ImportError:
     from urlparse import urlparse as _urlparse
 
+url_epilog = """
+address URLs:
+  [//DOMAIN/]PATH       The default domain is '127.0.0.1:5672'
+  //example.net/jobs
+  //10.0.0.10:5672/jobs/alpha
+  //localhost/queue0
+  queue0
+"""
+
 class CommandError(Exception):
     def __init__(self, message, *args):
         if isinstance(message, Exception):
@@ -259,6 +268,5 @@ def parse_address_url(address):
 
     return host, port, path
 
-class _Formatter(_argparse.ArgumentDefaultsHelpFormatter,
-                 _argparse.RawDescriptionHelpFormatter):
+class _Formatter(_argparse.RawDescriptionHelpFormatter):
     pass

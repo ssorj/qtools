@@ -31,16 +31,23 @@ from .common import *
 
 _description = "Receive AMQP messages"
 
+_epilog = """
+example usage:
+  $ qreceive //example.net/queue0
+  $ qreceive queue0 queue1 > messages.txt
+"""
+
 class ReceiveCommand(Command):
     def __init__(self, home_dir):
         super(ReceiveCommand, self).__init__(home_dir)
 
         self.parser.description = _description
+        self.parser.epilog = url_epilog + _epilog
 
         self.add_link_arguments()
 
         self.parser.add_argument("-o", "--output", metavar="FILE",
-                                 help="Write messages to FILE")
+                                 help="Write messages to FILE (default stdout)")
         self.parser.add_argument("--max", metavar="COUNT", type=int,
                                  help="Stop after receiving COUNT messages")
 

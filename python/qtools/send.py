@@ -33,19 +33,26 @@ from .common import *
 
 _description = "Send AMQP messages"
 
+_epilog = """
+example usage:
+  $ qsend //example.net/queue0 -m abc -m xyz
+  $ qsend queue0 queue1 < messages.txt
+"""
+
 class SendCommand(Command):
     def __init__(self, home_dir):
         super(SendCommand, self).__init__(home_dir)
 
         self.parser.description = _description
+        self.parser.epilog = url_epilog + _epilog
 
         self.add_link_arguments()
 
-        self.parser.add_argument("-m", "--message", metavar="MESSAGE",
+        self.parser.add_argument("-m", "--message", metavar="CONTENT",
                                  action="append", default=list(),
-                                 help="A string containing the message content")
+                                 help="Send a message containing CONTENT.  This option can be repeated.")
         self.parser.add_argument("-i", "--input", metavar="FILE",
-                                 help="Read messages from FILE")
+                                 help="Read messages from FILE, one per line (default stdin)")
 
         self.add_common_arguments()
 

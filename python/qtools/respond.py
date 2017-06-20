@@ -32,11 +32,18 @@ from .common import *
 
 _description = "Respond to AMQP requests"
 
+_epilog = """
+example usage:
+  $ qrespond //example.net/queue0
+  $ qrespond queue0 queue1
+"""
+
 class RespondCommand(Command):
     def __init__(self, home_dir):
         super(RespondCommand, self).__init__(home_dir)
 
         self.parser.description = _description
+        self.parser.epilog = url_epilog + _epilog
 
         self.add_link_arguments()
 

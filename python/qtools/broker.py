@@ -31,7 +31,7 @@ import uuid as _uuid
 
 from .common import *
 
-_description = "A simple AMQP message broker for testing"
+_description = "An AMQP message broker for testing"
 
 class BrokerCommand(Command):
     def __init__(self, home_dir):
@@ -40,9 +40,9 @@ class BrokerCommand(Command):
         self.parser.description = _description
 
         self.parser.add_argument("--host", metavar="HOST", default="127.0.0.1",
-                                 help="Listen on HOST")
+                                 help="Listen on HOST (default 127.0.0.1)")
         self.parser.add_argument("--port", metavar="PORT", default=5672,
-                                 help="Listen on PORT")
+                                 help="Listen on PORT (default 5672)")
 
         self.add_common_arguments()
 

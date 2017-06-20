@@ -32,19 +32,26 @@ from .common import *
 
 _description = "Send AMQP requests"
 
+_epilog = """
+example usage:
+  $ qrequest //example.net/queue0 -r abc -r xyz
+  $ qrequest queue0 queue1 < requests.txt
+"""
+
 class RequestCommand(Command):
     def __init__(self, home_dir):
         super(RequestCommand, self).__init__(home_dir)
 
         self.parser.description = _description
+        self.parser.epilog = url_epilog + _epilog
 
         self.add_link_arguments()
 
-        self.parser.add_argument("-r", "--request", metavar="REQUEST",
+        self.parser.add_argument("-r", "--request", metavar="CONTENT",
                                  action="append", default=list(),
-                                 help="A string containing the request content")
+                                 help="Send a request containing CONTENT.  This option can be repeated.")
         self.parser.add_argument("-i", "--input", metavar="FILE",
-                                 help="Read requests from FILE")
+                                 help="Read requests from FILE, one per line (default stdin)")
 
         self.add_common_arguments()
 
