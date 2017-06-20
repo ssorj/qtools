@@ -1,35 +1,21 @@
 # Qtools
 
-    qsend [//HOST:PORT/]ADDRESS -m MESSAGE
-    qreceive [//HOST:PORT/]ADDRESS
-    qrequest [//HOST:PORT/]ADDRESS -r REQUEST
-    qrespond [//HOST:PORT/]ADDRESS
+    qsend [//DOMAIN/]ADDRESS -m MESSAGE
+    qreceive [//DOMAIN/]ADDRESS
+    qrequest [//DOMAIN/]ADDRESS -r REQUEST
+    qrespond [//DOMAIN/]ADDRESS
     qbroker [--host HOST] [--port PORT]
-
-## Common arguments
-
-`qsend`, `qreceive`, `qrequest`, and `qrespond` take one or more
-`ADDRESS-URL` arguments.
-
- - `ADDRESS-URL`
-
-`qsend` and `qrequest` take ....
-
-## qsend
-
-## qreceive
-
-## qrequest
-
-## qrespond
-
-## qbroker
 
 ## Dependencies
 
+ - make
  - python-qpid-proton
 
 ## Ubuntu
+
+Qtools requires a newer version of python-qpid-proton than Ubuntu
+provides by default.  Use these commands to install from the Ubuntu
+PPA.
 
     $ sudo add-apt-repository ppa:qpid/released
     $ apt-get install software-properties-common

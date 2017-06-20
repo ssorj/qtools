@@ -39,7 +39,7 @@ except ImportError:
 
 url_epilog = """
 address URLs:
-  [//DOMAIN/]PATH       The default domain is '127.0.0.1:5672'
+  [//DOMAIN/]ADDRESS    The default domain is '127.0.0.1:5672'
   //example.net/jobs
   //10.0.0.10:5672/jobs/alpha
   //localhost/queue0
