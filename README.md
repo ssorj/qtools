@@ -28,3 +28,10 @@
 ## Dependencies
 
  - python-qpid-proton
+
+## Ubuntu
+
+    $ sudo add-apt-repository ppa:qpid/released
+    $ apt-get install software-properties-common
+    $ add-apt-repository ppa:qpid/released
+    $ apt-get upgrade python-qpid-proton
