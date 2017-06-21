@@ -19,18 +19,16 @@
 #
 # -*- mode: sh; -*-
 
-set -ex
+set -e
 
-if (( $# != 2 )); then
-    echo "Usage: qtools-test HOST PORT"
+if (( $# != 1 )); then
+    echo "Usage: qtools-test ADDRESS-URL"
     exit 1
 fi
 
-host=$1
-port=$2
+url=$1
 
 sent_message=$RANDOM
-url=//$host:$port/q0
 
 qsend --verbose $url -m $sent_message &
 received_message=$(qreceive --verbose $url --max 1)
@@ -41,8 +39,6 @@ if [[ $sent_message != $received_message ]]; then
 fi
 
 echo "qtools-test: Send and receive PASSED"
-
-url=//$host:$port/q1
 
 qrespond --verbose $url --max 1 &
 qrequest --verbose $url -r abc
