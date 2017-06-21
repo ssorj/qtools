@@ -48,8 +48,8 @@ class ReceiveCommand(Command):
 
         self.parser.add_argument("-o", "--output", metavar="FILE",
                                  help="Write messages to FILE (default stdout)")
-        self.parser.add_argument("--max", metavar="COUNT", type=int,
-                                 help="Stop after receiving COUNT messages")
+        self.parser.add_argument("-c", "--count", metavar="COUNT", type=int,
+                                 help="Exit after receiving COUNT messages")
 
         self.add_common_arguments()
 
@@ -62,7 +62,7 @@ class ReceiveCommand(Command):
         self.init_common_attributes()
 
         self.output_file = _sys.stdout
-        self.max_count = self.args.max
+        self.max_count = self.args.count
 
         if self.args.output is not None:
             self.output_file = open(self.args.output, "w")

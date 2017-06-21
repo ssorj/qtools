@@ -29,7 +29,7 @@ qbroker --verbose --host $host --port $port &
 broker_pid=$!
 
 qrequest --verbose $url -r abc &
-qrespond --verbose $url --max 1
+qrespond --verbose $url --count 1
 
 trap "kill $broker_pid $respond_pid" EXIT
 

@@ -47,8 +47,8 @@ class RespondCommand(Command):
 
         self.add_link_arguments()
 
-        self.parser.add_argument("--max", metavar="COUNT", type=int,
-                                 help="Stop after responding to COUNT requests")
+        self.parser.add_argument("-c", "--count", metavar="COUNT", type=int,
+                                 help="Exit after sending COUNT responses")
 
         self.add_common_arguments()
 
@@ -60,7 +60,7 @@ class RespondCommand(Command):
         self.init_link_attributes()
         self.init_common_attributes()
 
-        self.max_count = self.args.max
+        self.max_count = self.args.count
 
 class _Handler(LinkHandler):
     def __init__(self, command):

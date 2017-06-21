@@ -31,7 +31,7 @@ url=$1
 sent_message=$RANDOM
 
 qsend --verbose $url -m $sent_message &
-received_message=$(qreceive --verbose $url --max 1)
+received_message=$(qreceive --verbose $url --count 1)
 
 if [[ $sent_message != $received_message ]]; then
     echo "qtools-test: Send and receive FAILED"
@@ -40,7 +40,7 @@ fi
 
 echo "qtools-test: Send and receive PASSED"
 
-qrespond --verbose $url --max 1 &
+qrespond --verbose $url --count 1 &
 response_message=$(qrequest --verbose $url -r abc)
 
 if [[ $response_message != ABC ]]; then
