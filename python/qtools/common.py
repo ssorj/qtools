@@ -45,7 +45,7 @@ address URLs:
   amqp://example.net:10000/jobs
   amqps://10.0.0.10/jobs/alpha
 
-  The default SCHEME is 'amqp'.  The default SERVER is '127.0.0.1:5672'.
+  By default, SCHEME is 'amqp' and SERVER is '127.0.0.1:5672'.
 """
 
 class CommandError(Exception):
