@@ -122,11 +122,11 @@ class _BrokerHandler(_handlers.MessagingHandler):
         self.verbose = False
 
     def on_start(self, event):
-        domain = "{}:{}".format(self.command.host, self.command.port)
+        interface = "{}:{}".format(self.command.host, self.command.port)
 
-        self.acceptor = event.container.listen(domain)
+        self.acceptor = event.container.listen(interface)
 
-        self.command.notice("Listening on '{}'", domain)
+        self.command.notice("Listening on '{}'", interface)
 
     def get_queue(self, address):
         try:

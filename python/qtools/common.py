@@ -39,11 +39,13 @@ except ImportError:
 
 url_epilog = """
 address URLs:
-  [//DOMAIN/]ADDRESS    The default domain is '127.0.0.1:5672'
-  //example.net/jobs
-  //10.0.0.10:5672/jobs/alpha
-  //localhost/queue0
+  [SCHEME:][//SERVER/]ADDRESS
   queue0
+  //localhost/queue0
+  amqp://example.net:10000/jobs
+  amqps://10.0.0.10/jobs/alpha
+
+  The default SCHEME is 'amqp'.  The default SERVER is '127.0.0.1:5672'.
 """
 
 class CommandError(Exception):
@@ -199,10 +201,10 @@ class LinkHandler(_handlers.MessagingHandler):
 
     def on_start(self, event):
         for url in self.command.urls:
-            host, port, address = parse_address_url(url)
-            domain = "{}:{}".format(host, port)
+            scheme, host, port, address = parse_address_url(url)
+            connection_url = "{}://{}:{}".format(scheme, host, port)
 
-            connection = event.container.connect(domain, allowed_mechs=b"ANONYMOUS")
+            connection = event.container.connect(connection_url, allowed_mechs=b"ANONYMOUS")
             links = self.open_links(event, connection, address)
 
             self.connections.append(connection)
@@ -250,23 +252,27 @@ def parse_address_url(address):
     if url.path is None:
         raise CommandError("The URL has no path")
 
+    scheme = url.scheme
     host = url.hostname
     port = url.port
     path = url.path
+
+    if scheme is None:
+        scheme = "amqp"
 
     if host is None:
         # XXX Should be "localhost" - a workaround for a proton issue
         host = "127.0.0.1"
 
     if port is None:
-        port = "5672"
+        port = 5672
 
     port = str(port)
 
     if path.startswith("/"):
         path = path[1:]
 
-    return host, port, path
+    return scheme, host, port, path
 
 class _Formatter(_argparse.RawDescriptionHelpFormatter):
     pass
