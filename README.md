@@ -43,3 +43,7 @@ After this you can install from source.
 ### Installing from source
 
     $ sudo make install PREFIX=/usr/local
+
+<!--
+(while true; do echo message; sleep 1; done) | qsend //amqp.zone/q0
+-->

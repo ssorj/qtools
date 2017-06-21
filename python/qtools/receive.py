@@ -92,4 +92,5 @@ class _Handler(LinkHandler):
                                 event.connection.remote_container)
 
         if self.received_messages == self.command.max_count:
+            self.command.output_file.flush()
             self.close()

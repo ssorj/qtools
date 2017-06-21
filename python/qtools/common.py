@@ -177,14 +177,14 @@ class InputThread(_threading.Thread):
                 if self.command.done.is_set():
                     break
 
-                body = f.readline()
+                string = f.readline()
 
-                if body == "":
+                if string == "":
                     self.command.send_input(None)
                     break
 
-                body = unicode(body[:-1])
-                message = _proton.Message(body)
+                string = unicode(string[:-1])
+                message = _proton.Message(string)
 
                 self.command.send_input(message)
 
