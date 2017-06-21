@@ -52,6 +52,8 @@ class RequestCommand(Command):
                                  help="Send a request containing CONTENT.  This option can be repeated.")
         self.parser.add_argument("-i", "--input", metavar="FILE",
                                  help="Read requests from FILE, one per line (default stdin)")
+        self.parser.add_argument("-o", "--output", metavar="FILE",
+                                 help="Write messages to FILE (default stdout)")
 
         self.add_common_arguments()
 
@@ -67,9 +69,13 @@ class RequestCommand(Command):
         self.init_common_attributes()
 
         self.input_file = _sys.stdin
+        self.output_file = _sys.stdout
 
         if self.args.input is not None:
             self.input_file = open(self.args.input, "r")
+
+        if self.args.output is not None:
+            self.output_file = open(self.args.output, "w")
 
         for value in self.args.request:
             message = _proton.Message(unicode(value))
@@ -95,7 +101,6 @@ class _Handler(LinkHandler):
         self.receivers_by_sender = dict()
 
         self.sent_requests = 0
-        self.settled_requests = 0
         self.received_responses = 0
         self.stop_requested = False
 
@@ -115,13 +120,14 @@ class _Handler(LinkHandler):
         self.send_request(event)
 
     def on_settled(self, event):
-        self.settled_requests += 1
-
         if self.stop_requested and self.sent_requests == self.received_responses:
             self.close()
 
     def on_message(self, event):
         self.received_responses += 1
+
+        self.command.output_file.write(event.message.body)
+        self.command.output_file.write("\n")
 
         self.command.notice("Received response '{}'", event.message.body)
 
