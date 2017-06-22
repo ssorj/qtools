@@ -58,9 +58,14 @@ devel: install
 	qreceive --help > /dev/null
 	qrequest --help > /dev/null
 	qrespond --help > /dev/null
-#	qdrain --help > /dev/null
-#	qping --help > /dev/null
+	qmessage --help > /dev/null
+
 
 .PHONY:
 test: devel
 	scripts/run-tests
+
+.PHONY: big-test
+big-test: test
+	qtools-test //amqp.zone/queue-$$RANDOM
+	qtools-test amqps://messaging-enmasse.34.210.100.115.nip.io:443/myqueue

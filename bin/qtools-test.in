@@ -27,16 +27,13 @@ if (( $# != 1 )); then
 fi
 
 url=$1
+work_dir=$(mktemp -d)
 sent_message=$RANDOM
 
-qsend $OPTIONS $url --message $sent_message &
-send_pid=$!
+qreceive $OPTIONS $url --count 1 > $work_dir/received_message &
+qsend $OPTIONS $url --message $sent_message
 
-trap "kill $send_pid 2> /dev/null || :" EXIT
-
-received_message=$(qreceive $OPTIONS $url --count 1)
-
-if [[ $sent_message != $received_message ]]; then
+if [[ $(cat $work_dir/received_message) != $sent_message ]]; then
     echo "qtools-test: Send and receive FAILED"
     exit 1
 fi
@@ -44,15 +41,13 @@ fi
 echo "qtools-test: Send and receive PASSED"
 
 qrespond $OPTIONS $url --count 1 &
-respond_pid=$!
+qrequest $OPTIONS $url --message abc > $work_dir/response_message
 
-trap "kill $respond_pid 2> /dev/null || :" EXIT
-
-response_message=$(qrequest $OPTIONS $url --message abc)
-
-if [[ $response_message != ABC ]]; then
+if [[ $(cat $work_dir/response_message) != ABC ]]; then
     echo "qtools-test: Request and respond FAILED"
     exit 1
 fi
+
+rm -rf $work_dir
 
 echo "qtools-test: Request and respond PASSED"
