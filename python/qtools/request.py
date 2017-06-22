@@ -34,7 +34,7 @@ _description = "Send AMQP requests"
 
 _epilog = """
 example usage:
-  $ qrequest //example.net/queue0 -r abc -r xyz
+  $ qrequest //example.net/queue0 -m abc -m xyz
   $ qrequest queue0 queue1 < requests.txt
 """
 
@@ -47,19 +47,19 @@ class RequestCommand(Command):
 
         self.add_link_arguments()
 
-        self.parser.add_argument("-r", "--request", metavar="CONTENT",
+        self.parser.add_argument("-m", "--message", metavar="CONTENT",
                                  action="append", default=list(),
-                                 help="Send a request containing CONTENT.  This option can be repeated.")
+                                 help="Send a request message containing CONTENT.  This option can be repeated.")
         self.parser.add_argument("-i", "--input", metavar="FILE",
-                                 help="Read requests from FILE, one per line (default stdin)")
+                                 help="Read request messages from FILE, one per line (default stdin)")
         self.parser.add_argument("-o", "--output", metavar="FILE",
-                                 help="Write messages to FILE (default stdout)")
+                                 help="Write response messages to FILE (default stdout)")
 
         self.add_common_arguments()
 
         self.container.handler = _Handler(self)
 
-        self.requests = _collections.deque()
+        self.messages = _collections.deque()
         self.input_thread = InputThread(self)
 
     def init(self):
@@ -77,15 +77,15 @@ class RequestCommand(Command):
         if self.args.output is not None:
             self.output_file = open(self.args.output, "w")
 
-        for value in self.args.request:
+        for value in self.args.message:
             message = _proton.Message(unicode(value))
             self.send_input(message)
 
-        if self.requests:
+        if self.messages:
             self.send_input(None)
 
     def send_input(self, message):
-        self.requests.appendleft(message)
+        self.messages.appendleft(message)
         self.events.trigger(_reactor.ApplicationEvent("input"))
 
     def run(self):
@@ -142,7 +142,7 @@ class _Handler(LinkHandler):
             return
 
         try:
-            request = self.command.requests.pop()
+            request = self.command.messages.pop()
         except IndexError:
             return
 
@@ -161,7 +161,7 @@ class _Handler(LinkHandler):
             self.senders.appendleft(sender)
 
         if not sender.credit:
-            self.command.requests.append(request)
+            self.command.messages.append(request)
             return
 
         receiver = self.receivers_by_sender[sender]

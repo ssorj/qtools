@@ -63,5 +63,4 @@ devel: install
 
 .PHONY:
 test: devel
-	scripts/test-send-receive
-	scripts/test-request-respond
+	scripts/run-tests

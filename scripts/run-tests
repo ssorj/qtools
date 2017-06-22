@@ -7,9 +7,9 @@
 # to you under the Apache License, Version 2.0 (the
 # "License"); you may not use this file except in compliance
 # with the License.  You may obtain a copy of the License at
-#
+# 
 #   http://www.apache.org/licenses/LICENSE-2.0
-#
+# 
 # Unless required by applicable law or agreed to in writing,
 # software distributed under the License is distributed on an
 # "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
@@ -22,17 +22,12 @@
 set -e
 
 host=127.0.0.1
-port=56721
-url=//$host:$port/q1
+port=56720
+url=//$host:$port/q0
 
 qbroker --verbose --host $host --port $port &
 broker_pid=$!
 
-qrequest --verbose $url -r abc &
-qrespond --verbose $url --count 1
+trap "kill $broker_pid" EXIT
 
-trap "kill $broker_pid $respond_pid" EXIT
-
-sleep 0.2
-
-echo "$0: PASSED"
+qtools-test $url
