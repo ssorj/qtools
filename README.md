@@ -1,9 +1,15 @@
 # Qtools
 
-    qsend [//DOMAIN/]ADDRESS -m MESSAGE
-    qreceive [//DOMAIN/]ADDRESS
-    qrequest [//DOMAIN/]ADDRESS -r REQUEST
-    qrespond [//DOMAIN/]ADDRESS
+    qsend [SCHEME:][//SERVER/]ADDRESS --message MESSAGE
+    
+    qreceive [SCHEME:][//SERVER/]ADDRESS --count 1
+    -> MESSAGE
+    
+    qrequest [SCHEME:][//SERVER/]ADDRESS --message REQUEST
+    -> RESPONSE
+    
+    qrespond [SCHEME:][//SERVER/]ADDRESS --count 1
+
     qbroker [--host HOST] [--port PORT]
 
 ## Installation
