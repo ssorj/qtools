@@ -23,7 +23,7 @@ set -e
 
 host=127.0.0.1
 port=56720
-url=//$host:$port/q0
+url=//$host:$port/queue-$RANDOM
 
 qbroker $OPTIONS --host $host --port $port &
 broker_pid=$!

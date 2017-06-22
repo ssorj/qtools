@@ -41,8 +41,10 @@ class MessageCommand(Command):
 
         self.parser.add_argument("-o", "--output", metavar="FILE",
                                  help="Write messages to FILE (default stdout)")
-        self.parser.add_argument("-c", "--count", metavar="COUNT", type=int, default=1,
+        self.parser.add_argument("-c", "--count", metavar="COUNT", type=int,
                                  help="Exit after generating COUNT messages (default 1)")
+        self.parser.add_argument("--rate", metavar="COUNT", type=int,
+                                 help="Generate COUNT messages per second")
 
         self.parser.add_argument("--id", metavar="STRING",
                                  help="Set the message identifier")
@@ -71,6 +73,18 @@ class MessageCommand(Command):
 
         self.output_file = _sys.stdout
         self.max_count = self.args.count
+        self.rate = self.args.rate
+
+        self.interval = None
+
+        if self.rate is None:
+            if self.max_count is None:
+                self.max_count = 1
+        else:
+            self.interval = 1.0 / self.rate
+
+            if self.max_count is None:
+                self.max_count = -1
 
         if self.args.output is not None:
             self.output_file = open(self.args.output, "w")
@@ -96,16 +110,18 @@ class MessageCommand(Command):
         if self.message.body is None:
             self.generate_message_body = True
 
+        self.id_prefix = unique_id()
+
     def run(self):
         count = 0
-        id_prefix = unique_id()
 
         with self.output_file as f:
-            while count < self.max_count:
+            while count != self.max_count:
                 count += 1
+                start_time = _time.time()
 
                 if self.generate_message_id:
-                    self.message.id = "{}-{:04}".format(id_prefix, count)
+                    self.message.id = "{}-{:04}".format(self.id_prefix, count)
 
                 if self.generate_message_body:
                     self.message.body = "message-{:04}".format(count)
@@ -116,3 +132,6 @@ class MessageCommand(Command):
 
                 f.write("\n")
                 f.flush()
+
+                if self.interval is not None:
+                    _time.sleep(self.interval - (_time.time() - start_time))

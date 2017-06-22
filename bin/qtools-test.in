@@ -30,6 +30,8 @@ url=$1
 work_dir=$(mktemp -d)
 sent_message=$RANDOM
 
+trap 'kill $(jobs -p)' SIGINT
+
 qreceive $OPTIONS $url --count 1 > $work_dir/received_message &
 qsend $OPTIONS $url --message $sent_message
 
