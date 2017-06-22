@@ -55,6 +55,7 @@ class RequestCommand(Command):
         self.parser.add_argument("-o", "--output", metavar="FILE",
                                  help="Write response messages to FILE (default stdout)")
 
+        self.add_container_arguments()
         self.add_common_arguments()
 
         self.container.handler = _Handler(self)
@@ -66,6 +67,7 @@ class RequestCommand(Command):
         super(RequestCommand, self).init()
 
         self.init_link_attributes()
+        self.init_container_attributes()
         self.init_common_attributes()
 
         self.input_file = _sys.stdin

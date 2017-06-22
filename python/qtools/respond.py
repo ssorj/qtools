@@ -50,6 +50,7 @@ class RespondCommand(Command):
         self.parser.add_argument("-c", "--count", metavar="COUNT", type=int,
                                  help="Exit after sending COUNT responses")
 
+        self.add_container_arguments()
         self.add_common_arguments()
 
         self.container.handler = _Handler(self)
@@ -58,6 +59,7 @@ class RespondCommand(Command):
         super(RespondCommand, self).init()
 
         self.init_link_attributes()
+        self.init_container_attributes()
         self.init_common_attributes()
 
         self.max_count = self.args.count

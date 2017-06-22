@@ -44,11 +44,13 @@ class BrokerCommand(Command):
         self.parser.add_argument("--port", metavar="PORT", default=5672,
                                  help="Listen on PORT (default 5672)")
 
+        self.add_container_arguments()
         self.add_common_arguments()
 
     def init(self):
         super(BrokerCommand, self).init()
 
+        self.init_container_attributes()
         self.init_common_attributes()
 
         self.host = self.args.host

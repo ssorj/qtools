@@ -25,7 +25,7 @@ host=127.0.0.1
 port=56720
 url=//$host:$port/q0
 
-qbroker --verbose --host $host --port $port &
+qbroker $OPTIONS --host $host --port $port &
 broker_pid=$!
 
 trap "kill $broker_pid" EXIT

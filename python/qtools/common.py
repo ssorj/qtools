@@ -87,9 +87,11 @@ class Command(object):
         self.parser.add_argument("url", metavar="ADDRESS-URL", nargs="+",
                                  help="The location of a message source or target")
 
-    def add_common_arguments(self):
+    def add_container_arguments(self):
         self.parser.add_argument("--id", metavar="ID",
                                  help="Set the container identity to ID")
+
+    def add_common_arguments(self):
         self.parser.add_argument("--quiet", action="store_true",
                                  help="Print no logging to the console")
         self.parser.add_argument("--verbose", action="store_true",
@@ -106,8 +108,10 @@ class Command(object):
     def init_link_attributes(self):
         self.urls = self.args.url
 
-    def init_common_attributes(self):
+    def init_container_attributes(self):
         self.id = self.args.id
+
+    def init_common_attributes(self):
         self.quiet = self.args.quiet
         self.verbose = self.args.verbose
         self.init_only = self.args.init_only

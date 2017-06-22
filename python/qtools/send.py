@@ -54,6 +54,7 @@ class SendCommand(Command):
         self.parser.add_argument("-i", "--input", metavar="FILE",
                                  help="Read messages from FILE, one per line (default stdin)")
 
+        self.add_container_arguments()
         self.add_common_arguments()
 
         self.container.handler = _Handler(self)
@@ -65,6 +66,7 @@ class SendCommand(Command):
         super(SendCommand, self).init()
 
         self.init_link_attributes()
+        self.init_container_attributes()
         self.init_common_attributes()
 
         self.input_file = _sys.stdin
