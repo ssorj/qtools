@@ -132,9 +132,13 @@ class _Handler(LinkHandler):
         self.command.output_file.write("\n")
 
         if self.command.verbose:
-            self.command.notice("Received response '{}'", event.message.body)
+            self.command.notice("Received response '{}' from '{}' on '{}'",
+                                event.message.body,
+                                event.link.source.address,
+                                event.connection.remote_container)
 
         if self.stop_requested and self.sent_requests == self.received_responses:
+            self.command.output_file.flush()
             self.close()
 
     def send_request(self, event):
