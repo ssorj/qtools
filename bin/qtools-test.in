@@ -38,6 +38,9 @@ if [[ $(cat $work_dir/received_message) != $sent_message ]]; then
     exit 1
 fi
 
+qreceive $OPTIONS $url --count 10 > /dev/null &
+qmessage --count 10 | qsend $OPTIONS $url
+
 echo "qtools-test: Send and receive PASSED"
 
 qrespond $OPTIONS $url --count 1 &

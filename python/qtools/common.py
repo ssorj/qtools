@@ -25,6 +25,8 @@ from __future__ import with_statement
 
 import argparse as _argparse
 import binascii as _binascii
+import collections as _collections
+import json as _json
 import proton as _proton
 import proton.handlers as _handlers
 import proton.reactor as _reactor
@@ -117,10 +119,7 @@ class Command(object):
         self.init_only = self.args.init_only
 
         if self.id is None:
-            bytes_ = _uuid.uuid4().bytes[:2]
-            hex_ = _binascii.hexlify(bytes_).decode("utf-8")
-
-            self.id = "{}-{}".format(self.name, hex_)
+            self.id = "{}-{}".format(self.name, unique_id())
 
         self.container.container_id = self.id
 
@@ -187,8 +186,15 @@ class InputThread(_threading.Thread):
                     self.command.send_input(None)
                     break
 
-                string = unicode(string[:-1])
-                message = _proton.Message(string)
+                if string.endswith("\n"):
+                    string = string[:-1]
+
+                if string.startswith("{") and string.endswith("}"):
+                    data = _json.loads(string)
+                    message = convert_data_to_message(data)
+                else:
+                    string = unicode(string)
+                    message = _proton.Message(string)
 
                 self.command.send_input(message)
 
@@ -250,6 +256,12 @@ class LinkHandler(_handlers.MessagingHandler):
 
         self.command.events.close()
 
+def unique_id():
+    bytes_ = _uuid.uuid4().bytes[:2]
+    hex_ = _binascii.hexlify(bytes_).decode("utf-8")
+
+    return hex_
+
 def parse_address_url(address):
     url = _urlparse(address)
 
@@ -277,6 +289,48 @@ def parse_address_url(address):
         path = path[1:]
 
     return scheme, host, port, path
+
+def convert_data_to_message(data):
+    message = _proton.Message()
+
+    _set_message_attribute(message, "id", data, "id")
+    _set_message_attribute(message, "correlation_id", data, "correlation_id")
+    _set_message_attribute(message, "user", data, "user")
+    _set_message_attribute(message, "address", data, "to")
+    _set_message_attribute(message, "reply_to", data, "reply_to")
+    _set_message_attribute(message, "subject", data, "subject")
+    _set_message_attribute(message, "body", data, "body")
+
+    return message
+
+def _set_message_attribute(message, mname, data, dname):
+    try:
+        value = data[dname]
+    except KeyError:
+        return
+
+    setattr(message, mname, value)
+
+def convert_message_to_data(message):
+    data = _collections.OrderedDict()
+
+    _set_data_attribute(data, "id", message, "id")
+    _set_data_attribute(data, "correlation_id", message, "correlation_id")
+    _set_data_attribute(data, "user", message, "user_id")
+    _set_data_attribute(data, "to", message, "address")
+    _set_data_attribute(data, "reply_to", message, "reply_to")
+    _set_data_attribute(data, "subject", message, "subject")
+    _set_data_attribute(data, "body", message, "body")
+
+    return data
+
+def _set_data_attribute(data, dname, message, mname, omit_if_empty=True):
+    value = getattr(message, mname)
+
+    if omit_if_empty and value in (None, ""):
+        return
+
+    data[dname] = getattr(message, mname)
 
 class _Formatter(_argparse.RawDescriptionHelpFormatter):
     pass

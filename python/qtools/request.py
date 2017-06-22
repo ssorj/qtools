@@ -131,7 +131,8 @@ class _Handler(LinkHandler):
         self.command.output_file.write(event.message.body)
         self.command.output_file.write("\n")
 
-        self.command.notice("Received response '{}'", event.message.body)
+        if self.command.verbose:
+            self.command.notice("Received response '{}'", event.message.body)
 
         if self.stop_requested and self.sent_requests == self.received_responses:
             self.close()

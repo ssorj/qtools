@@ -24,9 +24,10 @@ from __future__ import unicode_literals
 from __future__ import with_statement
 
 import collections as _collections
+import json as _json
+import proton as _proton
 import sys as _sys
 import time as _time
-import uuid as _uuid
 
 from .common import *
 
@@ -43,6 +44,26 @@ class MessageCommand(Command):
         self.parser.add_argument("-c", "--count", metavar="COUNT", type=int, default=1,
                                  help="Exit after generating COUNT messages (default 1)")
 
+        self.parser.add_argument("--id", metavar="STRING",
+                                 help="Set the message identifier")
+        self.parser.add_argument("--correlation-id", metavar="STRING",
+                                 help="Set an ID for matching related messages")
+        self.parser.add_argument("--user", metavar="STRING",
+                                 help="Set the ID of the user producing the message")
+        self.parser.add_argument("--to", metavar="ADDRESS",
+                                 help="Set the target address")
+        self.parser.add_argument("--reply-to", metavar="ADDRESS",
+                                 help="Set the address for replies")
+        self.parser.add_argument("--subject", metavar="STRING",
+                                 help="Set the message summary")
+        self.parser.add_argument("--body", metavar="STRING",
+                                 help="Set the main message content")
+
+        # to
+        # reply_to
+        # body, body_size
+        #
+
         self.add_common_arguments()
 
     def init(self):
@@ -53,17 +74,45 @@ class MessageCommand(Command):
 
         if self.args.output is not None:
             self.output_file = open(self.args.output, "w")
-            
+
+        self.init_message()
+
+    def init_message(self):
+        self.message = _proton.Message()
+        self.message.id = self.args.id
+        self.message.correlation_id = self.args.correlation_id
+        self.message.user_id = self.args.user
+        self.message.address = self.args.to
+        self.message.reply_to = self.args.reply_to
+        self.message.subject = self.args.subject
+        self.message.body = self.args.body
+
+        self.generate_message_id = False
+        self.generate_message_body = False
+
+        if self.message.id is None:
+            self.generate_message_id = True
+
+        if self.message.body is None:
+            self.generate_message_body = True
+
     def run(self):
         count = 0
+        id_prefix = unique_id()
 
         with self.output_file as f:
             while count < self.max_count:
                 count += 1
 
-                message = "message-{}".format(count)
+                if self.generate_message_id:
+                    self.message.id = "{}-{:04}".format(id_prefix, count)
 
-                f.write(message)
+                if self.generate_message_body:
+                    self.message.body = "message-{:04}".format(count)
+
+                data = convert_message_to_data(self.message)
+
+                _json.dump(data, f)
+
                 f.write("\n")
                 f.flush()
-                
