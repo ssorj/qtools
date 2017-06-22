@@ -10,6 +10,9 @@
     
     qrespond [SCHEME:][//SERVER/]ADDRESS --count 1
 
+    qmessage --count 1 --id ID --body CONTENT
+    -> MESSAGE
+
     qbroker [--host HOST] [--port PORT]
 
 ## Installation
