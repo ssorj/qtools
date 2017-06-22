@@ -47,9 +47,9 @@ class MessageCommand(Command):
                                  help="Generate COUNT messages per second")
 
         self.parser.add_argument("--id", metavar="STRING",
-                                 help="Set the message identifier")
+                                 help="Set the message ID")
         self.parser.add_argument("--correlation-id", metavar="STRING",
-                                 help="Set an ID for matching related messages")
+                                 help="Set the ID for matching related messages")
         self.parser.add_argument("--user", metavar="STRING",
                                  help="Set the ID of the user producing the message")
         self.parser.add_argument("--to", metavar="ADDRESS",
