@@ -43,6 +43,9 @@ fi
 qreceive $OPTIONS $url --count 10 > /dev/null &
 qmessage --count 10 | qsend $OPTIONS $url
 
+qreceive $OPTIONS $url --count 1 < /dev/null &
+qmessage --count 1 | qsend --presettled $OPTIONS $url
+
 echo "qtools-test: Send and receive PASSED"
 
 qrespond $OPTIONS $url --count 1 &

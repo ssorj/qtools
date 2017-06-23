@@ -53,6 +53,8 @@ class SendCommand(Command):
                                  help="Send a message containing CONTENT.  This option can be repeated.")
         self.parser.add_argument("-i", "--input", metavar="FILE",
                                  help="Read messages from FILE, one per line (default stdin)")
+        self.parser.add_argument("--presettled", action="store_true",
+                                 help="Send messages with at-most-once reliability")
 
         self.add_container_arguments()
         self.add_common_arguments()
@@ -70,6 +72,7 @@ class SendCommand(Command):
         self.init_common_attributes()
 
         self.input_file = _sys.stdin
+        self.presettled = self.args.presettled
 
         if self.args.input is not None:
             self.input_file = open(self.args.input, "r")
@@ -101,7 +104,12 @@ class _Handler(LinkHandler):
         self.stop_requested = False
 
     def open_links(self, event, connection, address):
-        sender = event.container.create_sender(connection, address)
+        options = None
+
+        if self.command.presettled:
+            options = _reactor.AtMostOnce()
+
+        sender = event.container.create_sender(connection, address, options=options)
 
         self.senders.appendleft(sender)
 
@@ -139,7 +147,10 @@ class _Handler(LinkHandler):
             if self.sent_messages == self.settled_messages:
                 self.close()
             else:
-                self.stop_requested = True
+                if self.command.presettled:
+                    self.close()
+                else:
+                    self.stop_requested = True
 
             return
 
