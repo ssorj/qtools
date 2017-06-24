@@ -54,6 +54,8 @@ class RequestCommand(Command):
                                  help="Read request messages from FILE, one per line (default stdin)")
         self.parser.add_argument("-o", "--output", metavar="FILE",
                                  help="Write response messages to FILE (default stdout)")
+        self.parser.add_argument("--presettled", action="store_true",
+                                 help="Send messages with at-most-once reliability")
 
         self.add_container_arguments()
         self.add_common_arguments()
@@ -72,6 +74,7 @@ class RequestCommand(Command):
 
         self.input_file = _sys.stdin
         self.output_file = _sys.stdout
+        self.presettled = self.args.presettled
 
         if self.args.input is not None:
             self.input_file = open(self.args.input, "r")
@@ -107,7 +110,12 @@ class _Handler(LinkHandler):
         self.stop_requested = False
 
     def open_links(self, event, connection, address):
-        sender = event.container.create_sender(connection, address)
+        options = None
+
+        if self.command.presettled:
+            options = _reactor.AtMostOnce()
+
+        sender = event.container.create_sender(connection, address, options=options)
         receiver = event.container.create_receiver(connection, None, dynamic=True)
 
         self.senders.appendleft(sender)
@@ -120,10 +128,6 @@ class _Handler(LinkHandler):
 
     def on_input(self, event):
         self.send_request(event)
-
-    def on_settled(self, event):
-        if self.stop_requested and self.sent_requests == self.received_responses:
-            self.close()
 
     def on_message(self, event):
         self.received_responses += 1
@@ -149,11 +153,11 @@ class _Handler(LinkHandler):
             return
 
         try:
-            request = self.command.messages.pop()
+            message = self.command.messages.pop()
         except IndexError:
             return
 
-        if request is None:
+        if message is None:
             if self.sent_requests == self.received_responses:
                 self.close()
             else:
@@ -168,22 +172,22 @@ class _Handler(LinkHandler):
             self.senders.appendleft(sender)
 
         if not sender.credit:
-            self.command.messages.append(request)
+            self.command.messages.append(message)
             return
 
         receiver = self.receivers_by_sender[sender]
-        request.reply_to = receiver.remote_source.address
+        message.reply_to = receiver.remote_source.address
 
-        if request.address is None:
-            request.address = sender.target.address
+        if message.address is None:
+            message.address = sender.target.address
 
-        delivery = sender.send(request)
+        delivery = sender.send(message)
 
         self.sent_requests += 1
 
         if self.command.verbose:
             self.command.notice("Sent request '{}' as delivery '{}' to '{}' on '{}'",
-                                request.body,
+                                message.body,
                                 delivery.tag,
                                 sender.target.address,
                                 sender.connection.remote_container)
