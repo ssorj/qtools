@@ -156,6 +156,13 @@ class Command(object):
 
         self._print_message(message, args)
 
+    def error(self, message, *args):
+        message = "Error! {}".format(message)
+
+        self._print_message(message, args)
+
+        _sys.exit(1)
+
     def _print_message(self, message, args):
         message = message.format(*args)
         message = "{}: {}".format(self.id, message)

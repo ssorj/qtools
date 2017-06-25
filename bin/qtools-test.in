@@ -29,6 +29,7 @@ fi
 url=$1
 work_dir=$(mktemp -d)
 sent_message=message-$RANDOM
+request_message=request-$RANDOM
 
 trap 'kill $(jobs -p)' SIGINT
 
@@ -45,8 +46,18 @@ qreceive $OPTIONS $url --count 10 > /dev/null
 qmessage --count 1 | qsend --presettled $OPTIONS $url &
 qreceive $OPTIONS $url --count 1 > /dev/null
 
-qrequest $OPTIONS $url --message abc > $work_dir/response_message &
+qrequest $OPTIONS $url --message $request_message > $work_dir/response_message &
 qrespond $OPTIONS $url --count 1
+
+if [[ $(cat $work_dir/response_message) != $request_message ]]; then
+    exit 1
+fi
+
+qrequest $OPTIONS $url --message abc > $work_dir/response_message &
+qrespond $OPTIONS $url --count 1 --config - <<EOF
+def process(request, response):
+    response.body = request.body.upper()
+EOF
 
 if [[ $(cat $work_dir/response_message) != ABC ]]; then
     exit 1
