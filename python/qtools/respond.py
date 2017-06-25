@@ -89,11 +89,10 @@ class _Handler(LinkHandler):
         request = event.message
         receiver = event.link
 
-        if self.command.verbose:
-            self.command.notice("Received request '{}' from '{}' on '{}'",
-                                request.body,
-                                receiver.source.address,
-                                event.connection.remote_container)
+        self.command.info("Received request '{}' from '{}' on '{}'",
+                          request.body,
+                          receiver.source.address,
+                          event.connection.remote_container)
 
         response = self.process(event.link, request)
         response.address = request.reply_to
@@ -102,11 +101,10 @@ class _Handler(LinkHandler):
         sender = self.senders_by_receiver[event.link]
         sender.send(response)
 
-        if self.command.verbose:
-            self.command.notice("Sent response '{}' to '{}' on '{}'",
-                                response.body,
-                                response.address,
-                                event.connection.remote_container)
+        self.command.info("Sent response '{}' to '{}' on '{}'",
+                          response.body,
+                          response.address,
+                          event.connection.remote_container)
 
         self.sent_responses += 1
 

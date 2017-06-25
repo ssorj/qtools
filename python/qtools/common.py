@@ -143,7 +143,7 @@ class Command(object):
         except KeyboardInterrupt:
             pass
 
-    def debug(self, message, *args):
+    def info(self, message, *args):
         if self.verbose:
             self._print_message(message, args)
 
@@ -224,9 +224,8 @@ class LinkHandler(_handlers.MessagingHandler):
     def on_connection_opened(self, event):
         assert event.connection in self.connections
 
-        if self.command.verbose:
-            self.command.notice("Connected to container '{}'",
-                                event.connection.remote_container)
+        self.command.info("Connected to container '{}'",
+                          event.connection.remote_container)
 
     def on_link_opened(self, event):
         assert event.link in self.links

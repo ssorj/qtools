@@ -132,7 +132,7 @@ class _Handler(LinkHandler):
                                    event.link.target.address)
 
         if delivery.remote_state == delivery.ACCEPTED:
-            self.command.debug(template, "accepted")
+            self.command.info(template, "accepted")
         elif delivery.remote_state == delivery.REJECTED:
             self.command.warn(template, "rejected")
         elif delivery.remote_state == delivery.RELEASED:
@@ -183,8 +183,8 @@ class _Handler(LinkHandler):
 
         self.sent_messages += 1
 
-        self.command.debug("Sent message '{}' as delivery '{}' to '{}' on '{}'",
-                           message.body,
-                           delivery.tag,
-                           sender.target.address,
-                           sender.connection.remote_container)
+        self.command.info("Sent message '{}' as delivery '{}' to '{}' on '{}'",
+                          message.body,
+                          delivery.tag,
+                          sender.target.address,
+                          sender.connection.remote_container)

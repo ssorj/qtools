@@ -87,11 +87,10 @@ class _Handler(LinkHandler):
         self.command.output_file.write(event.message.body)
         self.command.output_file.write("\n")
 
-        if self.command.verbose:
-            self.command.notice("Received message '{}' from '{}' on '{}'",
-                                event.message.body,
-                                event.link.source.address,
-                                event.connection.remote_container)
+        self.command.info("Received message '{}' from '{}' on '{}'",
+                          event.message.body,
+                          event.link.source.address,
+                          event.connection.remote_container)
 
         if self.received_messages == self.command.max_count:
             self.command.output_file.flush()
