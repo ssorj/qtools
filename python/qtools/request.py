@@ -35,7 +35,7 @@ _description = "Send AMQP requests"
 _epilog = """
 example usage:
   $ qrequest //example.net/queue0 -m abc -m xyz
-  $ qrequest queue0 queue1 < requests.txt
+  $ qrequest queue0 queue1 < messages.txt
 """
 
 class RequestCommand(Command):
