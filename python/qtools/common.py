@@ -245,6 +245,23 @@ class LinkHandler(_handlers.MessagingHandler):
         if self.opened_links == len(self.links):
             self.command.ready.set()
 
+    def on_settled(self, event):
+        delivery = event.delivery
+
+        template = "Container '{}' {{}} delivery '{}' to '{}'"
+        template = template.format(event.connection.remote_container,
+                                   delivery.tag,
+                                   event.link.target.address)
+
+        if delivery.remote_state == delivery.ACCEPTED:
+            self.command.info(template, "accepted")
+        elif delivery.remote_state == delivery.REJECTED:
+            self.command.warn(template, "rejected")
+        elif delivery.remote_state == delivery.RELEASED:
+            self.command.notice(template, "released")
+        elif delivery.remote_state == deliveyr.MODIFIED:
+            self.command.notice(template, "modified")
+
     def close(self):
         self.command.done.set()
 

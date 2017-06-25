@@ -122,23 +122,9 @@ class _Handler(LinkHandler):
         self.send_message(event)
 
     def on_settled(self, event):
+        super(_Handler, self).on_settled(event)
+
         self.settled_messages += 1
-
-        delivery = event.delivery
-
-        template = "Container '{}' {{}} delivery '{}' to '{}'"
-        template = template.format(event.connection.remote_container,
-                                   delivery.tag,
-                                   event.link.target.address)
-
-        if delivery.remote_state == delivery.ACCEPTED:
-            self.command.info(template, "accepted")
-        elif delivery.remote_state == delivery.REJECTED:
-            self.command.warn(template, "rejected")
-        elif delivery.remote_state == delivery.RELEASED:
-            self.command.notice(template, "released")
-        elif delivery.remote_state == deliveyr.MODIFIED:
-            self.command.notice(template, "modified")
 
         if self.stop_requested and self.sent_messages == self.settled_messages:
             self.close()
