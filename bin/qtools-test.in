@@ -28,35 +28,35 @@ fi
 
 url=$1
 work_dir=$(mktemp -d)
-sent_message=$RANDOM
+sent_message=message-$RANDOM
 
 trap 'kill $(jobs -p)' SIGINT
 
-qreceive $OPTIONS $url --count 1 > $work_dir/received_message &
-qsend $OPTIONS $url --message $sent_message
+qsend $OPTIONS $url --message $sent_message &
+received_message=$(qreceive $OPTIONS $url --count 1)
 
-if [[ $(cat $work_dir/received_message) != $sent_message ]]; then
+if [[ $received_message != $sent_message ]]; then
     exit 1
 fi
 
-qreceive $OPTIONS $url --count 10 > /dev/null &
-qmessage --count 10 | qsend $OPTIONS $url
+qmessage --count 10 | qsend $OPTIONS $url &
+qreceive $OPTIONS $url --count 10 > /dev/null
 
-qreceive $OPTIONS $url --count 1 > /dev/null &
-qmessage --count 1 | qsend --presettled $OPTIONS $url
+qmessage --count 1 | qsend --presettled $OPTIONS $url &
+qreceive $OPTIONS $url --count 1 > /dev/null
 
-qrespond $OPTIONS $url --count 1 &
-qrequest $OPTIONS $url --message abc > $work_dir/response_message
+qrequest $OPTIONS $url --message abc > $work_dir/response_message &
+qrespond $OPTIONS $url --count 1
 
 if [[ $(cat $work_dir/response_message) != ABC ]]; then
     exit 1
 fi
 
-qrespond $OPTIONS $url --count 10 &
-qmessage --count 10 | qrequest $OPTIONS $url > /dev/null
+qmessage --count 10 | qrequest $OPTIONS $url > /dev/null &
+qrespond $OPTIONS $url --count 10
 
-qrespond $OPTIONS $url --count 1 &
-qmessage --count 1 | qrequest --presettled $OPTIONS $url > /dev/null
+qmessage --count 1 | qrequest --presettled $OPTIONS $url > /dev/null &
+qrespond $OPTIONS $url --count 1
 
 rm -rf $work_dir
 
