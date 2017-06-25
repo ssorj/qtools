@@ -144,18 +144,16 @@ class Command(object):
             pass
 
     def debug(self, message, *args):
-        if not self.verbose:
-            return
-
-        self._print_message(message, args)
+        if self.verbose:
+            self._print_message(message, args)
 
     def notice(self, message, *args):
-        if self.quiet:
-            return
+        if not self.quiet:
+            self._print_message(message, args)
 
-        self._print_message(message, args)
+    def warn(self, message, *args):
+        message = "Warning! {}".format(message)
 
-    def error(self, message, *args):
         self._print_message(message, args)
 
     def _print_message(self, message, args):
