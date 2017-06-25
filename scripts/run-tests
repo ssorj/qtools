@@ -31,3 +31,7 @@ broker_pid=$!
 trap "kill $broker_pid" EXIT
 
 qtools-test $url
+
+OPTIONS=--verbose qtools-test $url 2>/dev/null
+
+echo "PASSED"
