@@ -43,10 +43,13 @@ if [[ $received_message != $sent_message ]]; then
 fi
 
 qmessage --count 10 | qsend --id $sender_id $OPTIONS $url &
-qreceive --id $receiver_id $OPTIONS $url --count 10 > /dev/null
+qreceive --id $receiver_id $OPTIONS $url --count 10 >/dev/null
+
+qmessage --count 10 --rate 1000 | qsend $OPTIONS $url &
+qreceive $OPTIONS $url --count 10 >/dev/null
 
 qmessage --count 1 | qsend --presettled $OPTIONS $url &
-qreceive $OPTIONS $url --count 1 > /dev/null
+qreceive $OPTIONS $url --count 1 >/dev/null
 
 qrequest $OPTIONS $url --message $request_message > $work_dir/response_message &
 qrespond $OPTIONS $url --count 1
@@ -65,10 +68,13 @@ if [[ $(cat $work_dir/response_message) != ABC ]]; then
     exit 1
 fi
 
-qmessage --count 10 | qrequest --id $sender_id $OPTIONS $url > /dev/null &
+qmessage --count 10 | qrequest --id $sender_id $OPTIONS $url >/dev/null &
 qrespond --id $receiver_id $OPTIONS $url --count 10
 
-qmessage --count 1 | qrequest --presettled $OPTIONS $url > /dev/null &
+qmessage --count 10 --rate 1000 | qrequest $OPTIONS $url >/dev/null &
+qrespond $OPTIONS $url --count 10
+
+qmessage --count 1 | qrequest --presettled $OPTIONS $url >/dev/null &
 qrespond $OPTIONS $url --count 1
 
 rm -rf $work_dir

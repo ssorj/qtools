@@ -134,4 +134,5 @@ class MessageCommand(Command):
                 f.flush()
 
                 if self.interval is not None:
-                    _time.sleep(self.interval - (_time.time() - start_time))
+                    adjusted = max(0, self.interval - (_time.time() - start_time))
+                    _time.sleep(adjusted)
