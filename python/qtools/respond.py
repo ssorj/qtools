@@ -97,7 +97,7 @@ class RespondCommand(Command):
 
 class _Handler(LinkHandler):
     def __init__(self, command):
-        super(_Handler, self).__init__(command)
+        super(_Handler, self).__init__(command, auto_accept=False)
 
         self.receivers = list()
         self.senders_by_receiver = dict()
@@ -126,8 +126,6 @@ class _Handler(LinkHandler):
                           receiver.source.address,
                           event.connection.remote_container)
 
-        processing_succeeded = False
-
         response = _proton.Message()
         response.address = request.reply_to
         response.correlation_id = request.correlation_id
@@ -136,10 +134,7 @@ class _Handler(LinkHandler):
             self.command.process(request, response)
             processing_succeeded = True
         except:
-            self.command.warn("Processing request '{}' failed",
-                              request.body)
-
-            delivery.update(delivery.REJECTED) # XXX This isn't working
+            processing_succeeded = False
 
         self.processed_requests += 1
 
@@ -151,6 +146,13 @@ class _Handler(LinkHandler):
                               response.body,
                               response.address,
                               event.connection.remote_container)
+
+            self.accept(delivery)
+        else:
+            self.command.warn("Processing request '{}' failed",
+                              request.body)
+
+            self.reject(delivery)
 
         if self.processed_requests == self.command.max_count:
             self.close()

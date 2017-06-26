@@ -204,8 +204,8 @@ class InputThread(_threading.Thread):
                 self.command.send_input(message)
 
 class LinkHandler(_handlers.MessagingHandler):
-    def __init__(self, command):
-        super(LinkHandler, self).__init__()
+    def __init__(self, command, **kwargs):
+        super(LinkHandler, self).__init__(**kwargs)
 
         self.command = command
 
@@ -266,7 +266,7 @@ class LinkHandler(_handlers.MessagingHandler):
             self.command.warn(template, "rejected")
         elif delivery.remote_state == delivery.RELEASED:
             self.command.notice(template, "released")
-        elif delivery.remote_state == deliveyr.MODIFIED:
+        elif delivery.remote_state == delivery.MODIFIED:
             self.command.notice(template, "modified")
 
     def close(self):
