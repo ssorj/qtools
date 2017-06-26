@@ -121,10 +121,10 @@ class _Handler(LinkHandler):
         request = event.message
         receiver = event.link
 
-        self.command.info("Received request '{}' from '{}' on '{}'",
-                          request.body,
-                          receiver.source.address,
-                          event.connection.remote_container)
+        self.command.info("Received request {} from {} on {}",
+                          request,
+                          receiver.source,
+                          event.connection)
 
         response = _proton.Message()
         response.address = request.reply_to
@@ -142,15 +142,14 @@ class _Handler(LinkHandler):
             sender = self.senders_by_receiver[event.link]
             sender.send(response)
 
-            self.command.info("Sent response '{}' to '{}' on '{}'",
-                              response.body,
-                              response.address,
-                              event.connection.remote_container)
+            self.command.info("Sent response {} to {} on {}",
+                              response,
+                              sender.target,
+                              event.connection)
 
             self.accept(delivery)
         else:
-            self.command.warn("Processing request '{}' failed",
-                              request.body)
+            self.command.warn("Processing request {} failed", request)
 
             self.reject(delivery)
 

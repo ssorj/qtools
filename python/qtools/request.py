@@ -135,10 +135,10 @@ class _Handler(LinkHandler):
         self.command.output_file.write(event.message.body)
         self.command.output_file.write("\n")
 
-        self.command.info("Received response '{}' from '{}' on '{}'",
-                          event.message.body,
-                          event.link.source.address,
-                          event.connection.remote_container)
+        self.command.info("Received response {} from {} on {}",
+                          event.message,
+                          event.link.source,
+                          event.connection)
 
         if self.stop_requested and self.sent_requests == self.received_responses:
             self.command.output_file.flush()
@@ -184,8 +184,8 @@ class _Handler(LinkHandler):
 
         self.sent_requests += 1
 
-        self.command.info("Sent request '{}' as delivery '{}' to '{}' on '{}'",
-                          message.body,
-                          delivery.tag,
-                          sender.target.address,
-                          sender.connection.remote_container)
+        self.command.info("Sent request {} as {} to {} on {}",
+                          message,
+                          delivery,
+                          sender.target,
+                          sender.connection)

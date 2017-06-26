@@ -169,8 +169,8 @@ class _Handler(LinkHandler):
 
         self.sent_messages += 1
 
-        self.command.info("Sent message '{}' as delivery '{}' to '{}' on '{}'",
-                          message.body,
-                          delivery.tag,
-                          sender.target.address,
-                          sender.connection.remote_container)
+        self.command.info("Sent {} as {} to {} on {}",
+                          message,
+                          delivery,
+                          sender.target,
+                          sender.connection)

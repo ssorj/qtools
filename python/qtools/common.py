@@ -164,7 +164,10 @@ class Command(object):
         _sys.exit(1)
 
     def _print_message(self, message, args):
-        message = message.format(*args)
+        summarized_args = [_summarize(x) for x in args]
+
+        message = message[0].upper() + message[1:]
+        message = message.format(*summarized_args)
         message = "{}: {}".format(self.id, message)
 
         _sys.stderr.write("{}\n".format(message))
@@ -231,8 +234,7 @@ class LinkHandler(_handlers.MessagingHandler):
     def on_connection_opened(self, event):
         assert event.connection in self.connections
 
-        self.command.info("Connected to container '{}'",
-                          event.connection.remote_container)
+        self.command.info("Connected to {}", event.connection)
 
     def on_link_opened(self, event):
         assert event.link in self.links
@@ -240,14 +242,14 @@ class LinkHandler(_handlers.MessagingHandler):
         self.opened_links += 1
 
         if event.link.is_receiver:
-            self.command.notice("Created receiver for source address '{}' on container '{}'",
-                                event.link.source.address,
-                                event.connection.remote_container)
+            self.command.notice("Created receiver for {} on {}",
+                                event.link.source,
+                                event.connection)
 
         if event.link.is_sender:
-            self.command.notice("Created sender for target address '{}' on container '{}'",
-                                event.link.target.address,
-                                event.connection.remote_container)
+            self.command.notice("Created sender for {} on {}",
+                                event.link.target,
+                                event.connection)
 
         if self.opened_links == len(self.links):
             self.command.ready.set()
@@ -255,10 +257,10 @@ class LinkHandler(_handlers.MessagingHandler):
     def on_settled(self, event):
         delivery = event.delivery
 
-        template = "Container '{}' {{}} delivery '{}' to '{}'"
-        template = template.format(event.connection.remote_container,
-                                   delivery.tag,
-                                   event.link.target.address)
+        template = "{} {{}} {} to {}"
+        template = template.format(_summarize(event.connection),
+                                   _summarize(delivery),
+                                   _summarize(event.link.target))
 
         if delivery.remote_state == delivery.ACCEPTED:
             self.command.info(template, "accepted")
@@ -276,6 +278,57 @@ class LinkHandler(_handlers.MessagingHandler):
             connection.close()
 
         self.command.events.close()
+
+def _summarize(entity):
+    if isinstance(entity, _proton.Connection):
+        return _summarize_connection(entity)
+
+    if isinstance(entity, _proton.Terminus):
+        return _summarize_terminus(entity)
+
+    if isinstance(entity, _proton.Delivery):
+        return _summarize_delivery(entity)
+
+    if isinstance(entity, _proton.Message):
+        return _summarize_message(entity)
+
+    return entity
+
+def _summarize_connection(connection):
+    return "container '{}'".format(connection.remote_container)
+
+def _summarize_terminus(terminus):
+    if terminus.type == terminus.SOURCE:
+        type_ = "source"
+    elif terminus.type == terminus.TARGET:
+        type_ = "target"
+    else:
+        raise Exception()
+
+    if terminus.address is None:
+        if terminus.dynamic:
+            return "dynamic {}".format(type_)
+
+        return "null {}".format(type_)
+
+    return "{} '{}'".format(type_, terminus.address)
+
+def _summarize_delivery(delivery):
+    return "delivery '{}'".format(delivery.tag)
+
+def _summarize_message(message):
+    desc = message.body
+
+    if desc is None:
+        desc = message.id
+
+    if desc is None:
+        return "message"
+
+    if len(desc) > 16:
+        desc = "{}...".format(desc[:12])
+
+    return "message '{}'".format(desc)
 
 def unique_id():
     bytes_ = _uuid.uuid4().bytes[:2]
