@@ -82,8 +82,7 @@ class _BrokerQueue(object):
 
         self.consumers.append(link)
 
-        self.command.info("Added consumer for container '{}' to {}",
-                          link.connection.remote_container, self)
+        self.command.info("Added consumer for {} to {}", link.connection, self)
 
     def remove_consumer(self, link):
         assert link.is_sender
@@ -93,16 +92,12 @@ class _BrokerQueue(object):
         except ValueError:
             return
 
-        self.command.info("Removed consumer for container '{}' from {}",
-                          link.connection.remote_container, self)
+        self.command.info("Removed consumer for {} from {}", link.connection, self)
 
     def store_message(self, delivery, message):
         self.messages.append(message)
 
-        self.command.notice("Stored message '{}' from container '{}' on {}",
-                            message.body,
-                            delivery.connection.remote_container,
-                            self)
+        self.command.notice("Stored {} from {} on {}", message, delivery.connection, self)
 
     def forward_messages(self, link):
         assert link.is_sender
@@ -115,10 +110,7 @@ class _BrokerQueue(object):
 
             link.send(message)
 
-            self.command.notice("Forwarded message '{}' on {} to container '{}'",
-                                message.body,
-                                self,
-                                link.connection.remote_container)
+            self.command.notice("Forwarded {} on {} to {}", message, self, link.connection)
 
 class _BrokerHandler(_handlers.MessagingHandler):
     def __init__(self, command):
@@ -171,19 +163,16 @@ class _BrokerHandler(_handlers.MessagingHandler):
         event.connection.container = event.container.container_id
 
     def on_connection_opened(self, event):
-        self.command.notice("Opened connection from container '{}'",
-                            event.connection.remote_container)
+        self.command.notice("Opened connection from {}", event.connection)
 
     def on_connection_closing(self, event):
         self.remove_consumers(event.connection)
 
     def on_connection_closed(self, event):
-        self.command.notice("Closed connection from container '{}'",
-                            event.connection.remote_container)
+        self.command.notice("Closed connection from {}", event.connection)
 
     def on_disconnected(self, event):
-        self.command.notice("Disconnected from container '{}'",
-                            event.connection.remote_container)
+        self.command.notice("Disconnected from {}", event.connection)
 
         self.remove_consumers(event.connection)
 
@@ -204,10 +193,10 @@ class _BrokerHandler(_handlers.MessagingHandler):
     def on_settled(self, event):
         delivery = event.delivery
 
-        template = "Container '{}' {{}} delivery '{}' from '{}'"
-        template = template.format(event.connection.remote_container,
-                                   delivery.tag,
-                                   event.link.source.address)
+        template = "{} {{}} {} to {}"
+        template = template.format(summarize(event.connection),
+                                   summarize(delivery),
+                                   summarize(event.link.source))
 
         if delivery.remote_state == delivery.ACCEPTED:
             self.command.info(template, "accepted")

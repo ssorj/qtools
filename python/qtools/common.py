@@ -164,7 +164,7 @@ class Command(object):
         _sys.exit(1)
 
     def _print_message(self, message, args):
-        summarized_args = [_summarize(x) for x in args]
+        summarized_args = [summarize(x) for x in args]
 
         message = message[0].upper() + message[1:]
         message = message.format(*summarized_args)
@@ -258,9 +258,9 @@ class LinkHandler(_handlers.MessagingHandler):
         delivery = event.delivery
 
         template = "{} {{}} {} to {}"
-        template = template.format(_summarize(event.connection),
-                                   _summarize(delivery),
-                                   _summarize(event.link.target))
+        template = template.format(summarize(event.connection),
+                                   summarize(delivery),
+                                   summarize(event.link.target))
 
         if delivery.remote_state == delivery.ACCEPTED:
             self.command.info(template, "accepted")
@@ -279,7 +279,7 @@ class LinkHandler(_handlers.MessagingHandler):
 
         self.command.events.close()
 
-def _summarize(entity):
+def summarize(entity):
     if isinstance(entity, _proton.Connection):
         return _summarize_connection(entity)
 
