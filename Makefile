@@ -53,13 +53,7 @@ install: build
 .PHONY: devel
 devel: PREFIX := ${PWD}/install
 devel: install
-	qbroker --help > /dev/null
-	qsend --help > /dev/null
-	qreceive --help > /dev/null
-	qrequest --help > /dev/null
-	qrespond --help > /dev/null
-	qmessage --help > /dev/null
-
+	scripts/run-smoke-tests
 
 .PHONY:
 test: devel

@@ -28,6 +28,8 @@ fi
 
 url=$1
 work_dir=$(mktemp -d)
+sender_id=container-$RANDOM
+receiver_id=container-$RANDOM
 sent_message=message-$RANDOM
 request_message=request-$RANDOM
 
@@ -40,8 +42,8 @@ if [[ $received_message != $sent_message ]]; then
     exit 1
 fi
 
-qmessage --count 10 | qsend $OPTIONS $url &
-qreceive $OPTIONS $url --count 10 > /dev/null
+qmessage --count 10 | qsend --id $sender_id $OPTIONS $url &
+qreceive --id $receiver_id $OPTIONS $url --count 10 > /dev/null
 
 qmessage --count 1 | qsend --presettled $OPTIONS $url &
 qreceive $OPTIONS $url --count 1 > /dev/null
@@ -63,8 +65,8 @@ if [[ $(cat $work_dir/response_message) != ABC ]]; then
     exit 1
 fi
 
-qmessage --count 10 | qrequest $OPTIONS $url > /dev/null &
-qrespond $OPTIONS $url --count 10
+qmessage --count 10 | qrequest --id $sender_id $OPTIONS $url > /dev/null &
+qrespond --id $receiver_id $OPTIONS $url --count 10
 
 qmessage --count 1 | qrequest --presettled $OPTIONS $url > /dev/null &
 qrespond $OPTIONS $url --count 1

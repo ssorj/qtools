@@ -21,18 +21,10 @@
 
 set -e
 
-host=127.0.0.1
-port=56720
-url=//$host:$port/queue-$RANDOM
+qsend --init-only q0 > /dev/null
+qreceive --init-only //localhost/q0 > /dev/null
+qrequest --init-only amqp://localhost/q0 > /dev/null
+qrespond --init-only amqps://example.net:5672/jobs/alpha > /dev/null
 
-qbroker --quiet --host $host --port $port &
-broker_pid=$!
-
-trap "kill $broker_pid" EXIT
-
-qtools-test $url
-
-OPTIONS=--verbose qtools-test $url 2>/dev/null
-OPTIONS=--quiet qtools-test $url
-
-echo "PASSED"
+qmessage --init-only > /dev/null
+qbroker --init-only > /dev/null
