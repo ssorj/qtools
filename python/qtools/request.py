@@ -189,3 +189,11 @@ class _Handler(LinkHandler):
                           delivery,
                           sender.target,
                           sender.connection)
+    def close(self):
+        super(_Handler, self).close()
+
+        self.command.notice("Sent {} {} and received {} {}",
+                            self.sent_requests,
+                            plural("request", self.sent_requests),
+                            self.received_responses,
+                            plural("response", self.received_responses))

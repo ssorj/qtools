@@ -95,3 +95,10 @@ class _Handler(LinkHandler):
         if self.received_messages == self.command.max_count:
             self.command.output_file.flush()
             self.close()
+
+    def close(self):
+        super(_Handler, self).close()
+
+        self.command.notice("Received {} {}",
+                            self.received_messages,
+                            plural("message", self.received_messages))

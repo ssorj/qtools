@@ -336,6 +336,15 @@ def unique_id():
 
     return hex_
 
+def plural(word, count, override=None):
+    if count == 1:
+        return word
+
+    if override is not None:
+        return override
+
+    return word + "s"
+
 def parse_address_url(address):
     url = _urlparse(address)
 

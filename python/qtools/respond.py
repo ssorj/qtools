@@ -155,3 +155,10 @@ class _Handler(LinkHandler):
 
         if self.processed_requests == self.command.max_count:
             self.close()
+
+    def close(self):
+        super(_Handler, self).close()
+
+        self.command.notice("Processed {} {}",
+                            self.processed_requests,
+                            plural("request", self.processed_requests))
