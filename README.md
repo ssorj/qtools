@@ -15,6 +15,30 @@
 
     qbroker [--host HOST] [--port PORT]
 
+## Common arguments
+
+The 'qsend', 'qreceive', 'qrequest', and 'qrespond' commands take one
+or more URLs.  These indicate the location of a message source or
+target, such as a queue or topic.
+
+    qsend ADDRESS-URL [ADDRESS-URL ...]
+
+An address URL has optional scheme and server parts.  The default
+scheme is 'amqp' and 'server' is '127.0.0.1:5672'.
+
+    [SCHEME:][//SERVER/]ADDRESS
+
+With a few exceptions, all the tools share these options.
+
+    -h, --help            Print help output
+    --verbose             Print detailed logging
+    --quiet               Print no logging
+
+Tools that read from or write to the console take these options.
+
+    -i, --input FILE      Read input from FILE
+    -o, --output FILE     Write output to FILE
+
 ## Installation
 
 ### Dependencies
