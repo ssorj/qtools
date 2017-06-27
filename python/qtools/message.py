@@ -125,7 +125,6 @@ class MessageCommand(Command):
                     self.message.body = "message-{:04}".format(count)
 
                 data = convert_message_to_data(self.message)
-
                 _json.dump(data, f)
 
                 f.write("\n")

@@ -23,6 +23,7 @@ from __future__ import print_function
 from __future__ import unicode_literals
 from __future__ import with_statement
 
+import json as _json
 import proton as _proton
 import proton.reactor as _reactor
 import sys as _sys
@@ -48,6 +49,8 @@ class ReceiveCommand(Command):
 
         self.parser.add_argument("-o", "--output", metavar="FILE",
                                  help="Write messages to FILE (default stdout)")
+        self.parser.add_argument("--json", action="store_true",
+                                 help="Write messages in JSON format")
         self.parser.add_argument("-c", "--count", metavar="COUNT", type=int,
                                  help="Exit after receiving COUNT messages")
 
@@ -64,6 +67,7 @@ class ReceiveCommand(Command):
         self.init_common_attributes()
 
         self.output_file = _sys.stdout
+        self.json = self.args.json
         self.max_count = self.args.count
 
         if self.args.output is not None:
@@ -84,7 +88,12 @@ class _Handler(LinkHandler):
 
         self.received_messages += 1
 
-        self.command.output_file.write(event.message.body)
+        if self.command.json:
+            data = convert_message_to_data(event.message)
+            _json.dump(data, self.command.output_file)
+        else:
+            self.command.output_file.write(event.message.body)
+
         self.command.output_file.write("\n")
 
         self.command.info("Received {} from {} on {}",

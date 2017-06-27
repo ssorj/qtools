@@ -24,6 +24,7 @@ from __future__ import unicode_literals
 from __future__ import with_statement
 
 import collections as _collections
+import json as _json
 import proton as _proton
 import proton.reactor as _reactor
 import sys as _sys
@@ -54,6 +55,8 @@ class RequestCommand(Command):
                                  help="Read request messages from FILE, one per line (default stdin)")
         self.parser.add_argument("-o", "--output", metavar="FILE",
                                  help="Write response messages to FILE (default stdout)")
+        self.parser.add_argument("--json", action="store_true",
+                                 help="Write messages in JSON format")
         self.parser.add_argument("--presettled", action="store_true",
                                  help="Send messages with at-most-once reliability")
 
@@ -74,6 +77,7 @@ class RequestCommand(Command):
 
         self.input_file = _sys.stdin
         self.output_file = _sys.stdout
+        self.json = self.args.json
         self.presettled = self.args.presettled
 
         if self.args.input is not None:
@@ -132,7 +136,12 @@ class _Handler(LinkHandler):
     def on_message(self, event):
         self.received_responses += 1
 
-        self.command.output_file.write(event.message.body)
+        if self.command.json:
+            data = convert_message_to_data(event.message)
+            _json.dump(data, self.command.output_file)
+        else:
+            self.command.output_file.write(event.message.body)
+
         self.command.output_file.write("\n")
 
         self.command.info("Received response {} from {} on {}",
