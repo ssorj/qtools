@@ -56,15 +56,12 @@ class MessageCommand(Command):
                                  help="Set the target address")
         self.parser.add_argument("--reply-to", metavar="ADDRESS",
                                  help="Set the address for replies")
+        self.parser.add_argument("--durable", action="store_true",
+                                 help="Set the durable flag")
         self.parser.add_argument("--subject", metavar="STRING",
                                  help="Set the message summary")
         self.parser.add_argument("--body", metavar="STRING",
                                  help="Set the main message content")
-
-        # to
-        # reply_to
-        # body, body_size
-        #
 
         self.add_common_arguments()
 
@@ -100,6 +97,7 @@ class MessageCommand(Command):
         self.message.reply_to = self.args.reply_to
         self.message.subject = self.args.subject
         self.message.body = self.args.body
+        self.message.durable = self.args.durable
 
         self.generate_message_id = False
         self.generate_message_body = False

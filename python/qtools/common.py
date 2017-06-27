@@ -381,6 +381,7 @@ def convert_data_to_message(data):
     _set_message_attribute(message, "user", data, "user")
     _set_message_attribute(message, "address", data, "to")
     _set_message_attribute(message, "reply_to", data, "reply_to")
+    _set_message_attribute(message, "durable", data, "durable")
     _set_message_attribute(message, "subject", data, "subject")
     _set_message_attribute(message, "body", data, "body")
 
@@ -402,6 +403,7 @@ def convert_message_to_data(message):
     _set_data_attribute(data, "user", message, "user_id")
     _set_data_attribute(data, "to", message, "address")
     _set_data_attribute(data, "reply_to", message, "reply_to")
+    _set_data_attribute(data, "durable", message, "durable")
     _set_data_attribute(data, "subject", message, "subject")
     _set_data_attribute(data, "body", message, "body")
 
