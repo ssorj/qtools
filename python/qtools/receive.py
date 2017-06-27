@@ -51,6 +51,8 @@ class ReceiveCommand(Command):
                                  help="Write messages to FILE (default stdout)")
         self.parser.add_argument("--json", action="store_true",
                                  help="Write messages in JSON format")
+        self.parser.add_argument("--no-prefix", action="store_true",
+                                 help="Suppress address prefix")
         self.parser.add_argument("-c", "--count", metavar="COUNT", type=int,
                                  help="Exit after receiving COUNT messages")
 
@@ -68,6 +70,7 @@ class ReceiveCommand(Command):
 
         self.output_file = _sys.stdout
         self.json = self.args.json
+        self.no_prefix = self.args.no_prefix
         self.max_count = self.args.count
 
         if self.args.output is not None:
@@ -87,6 +90,10 @@ class _Handler(LinkHandler):
             return
 
         self.received_messages += 1
+
+        if not self.command.no_prefix:
+            prefix = event.link.source.address + ": "
+            self.command.output_file.write(prefix)
 
         if self.command.json:
             data = convert_message_to_data(event.message)

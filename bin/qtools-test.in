@@ -36,7 +36,7 @@ request_message=request-$RANDOM
 trap 'kill $(jobs -p)' SIGINT
 
 qsend $OPTIONS $url --message $sent_message &
-received_message=$(qreceive $OPTIONS $url --count 1)
+received_message=$(qreceive $OPTIONS $url --count 1 --no-prefix)
 
 if [[ $received_message != $sent_message ]]; then
     exit 1
