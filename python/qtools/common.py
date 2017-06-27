@@ -403,7 +403,10 @@ def convert_message_to_data(message):
     _set_data_attribute(data, "user", message, "user_id")
     _set_data_attribute(data, "to", message, "address")
     _set_data_attribute(data, "reply_to", message, "reply_to")
-    _set_data_attribute(data, "durable", message, "durable")
+
+    if message.durable:
+        _set_data_attribute(data, "durable", message, "durable")
+
     _set_data_attribute(data, "subject", message, "subject")
     _set_data_attribute(data, "body", message, "body")
 
