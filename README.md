@@ -59,7 +59,7 @@ Tools that read from or write to the console take these options.
 ### RHEL 7
 
     $ cd /etc/yum.repos.d && sudo wget https://copr.fedorainfracloud.org/coprs/jross/ssorj/repo/epel-7/jross-ssorj-epel-7.repo
-    $ sudo dnf install qtools
+    $ sudo yum install qtools
 
 ### Ubuntu 16.04
 
