@@ -48,7 +48,7 @@ qreceive --id $receiver_id $OPTIONS $url --count 10 >/dev/null
 qmessage --count 10 --rate 1000 | qsend $OPTIONS $url &
 qreceive $OPTIONS $url --count 10 >/dev/null
 
-qmessage --count 1 | qsend --presettled $OPTIONS $url &
+qmessage --count 1 --prop x y | qsend --presettled $OPTIONS $url &
 qreceive $OPTIONS $url --count 1 --json >/dev/null
 
 qrequest $OPTIONS $url --message $request_message > $work_dir/response_message &
@@ -74,7 +74,7 @@ qrespond --id $receiver_id $OPTIONS $url --count 10
 qmessage --count 10 --rate 1000 | qrequest $OPTIONS $url >/dev/null &
 qrespond $OPTIONS $url --count 10
 
-qmessage --count 1 | qrequest --presettled --json $OPTIONS $url >/dev/null &
+qmessage --count 1 --prop x y | qrequest --presettled --json $OPTIONS $url >/dev/null &
 qrespond $OPTIONS $url --count 1
 
 rm -rf $work_dir

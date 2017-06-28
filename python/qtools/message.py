@@ -62,6 +62,9 @@ class MessageCommand(Command):
                                  help="Set the message summary")
         self.parser.add_argument("--body", metavar="STRING",
                                  help="Set the main message content")
+        self.parser.add_argument("--prop", metavar=("NAME", "VALUE"),
+                                 nargs=2, action="append",
+                                 help="Set an application property")
 
         self.add_common_arguments()
 
@@ -98,6 +101,12 @@ class MessageCommand(Command):
         self.message.subject = self.args.subject
         self.message.body = self.args.body
         self.message.durable = self.args.durable
+
+        self.message.properties = _collections.OrderedDict()
+
+        if self.args.prop is not None:
+            for name, value in self.args.prop:
+                self.message.properties[name] = value
 
         self.generate_message_id = False
         self.generate_message_body = False

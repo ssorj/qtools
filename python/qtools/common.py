@@ -385,6 +385,13 @@ def convert_data_to_message(data):
     _set_message_attribute(message, "subject", data, "subject")
     _set_message_attribute(message, "body", data, "body")
 
+    if "properties" in data:
+        props = data["properties"]
+        message.properties = dict()
+
+        for name in props:
+            message.properties[name] = props[name]
+
     return message
 
 def _set_message_attribute(message, mname, data, dname):
@@ -406,6 +413,12 @@ def convert_message_to_data(message):
 
     if message.durable:
         _set_data_attribute(data, "durable", message, "durable")
+
+    if message.properties is not None:
+        props = data["properties"] = _collections.OrderedDict()
+
+        for name in message.properties:
+            props[name] = message.properties[name]
 
     _set_data_attribute(data, "subject", message, "subject")
     _set_data_attribute(data, "body", message, "body")
