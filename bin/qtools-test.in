@@ -68,6 +68,13 @@ if [[ $(cat $work_dir/response_message) != ABC ]]; then
     exit 1
 fi
 
+qrequest $OPTIONS $url --message abc > $work_dir/response_message &
+qrespond $OPTIONS $url --count 1 --upper --reverse --append " and this"
+
+if [[ $(cat $work_dir/response_message) != "CBA and this" ]]; then
+    exit 1
+fi
+
 qmessage --count 10 | qrequest --id $sender_id $OPTIONS $url >/dev/null &
 qrespond --id $receiver_id $OPTIONS $url --count 10
 

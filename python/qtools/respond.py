@@ -28,6 +28,7 @@ import proton.handlers as _handlers
 import proton.reactor as _reactor
 import runpy as _runpy
 import sys as _sys
+import traceback as _traceback
 
 from .common import *
 
@@ -57,10 +58,16 @@ class RespondCommand(Command):
 
         self.add_link_arguments()
 
-        self.parser.add_argument("--config", metavar="FILE",
-                                 help="Load processing code from FILE")
         self.parser.add_argument("-c", "--count", metavar="COUNT", type=int,
                                  help="Exit after processing COUNT requests")
+        self.parser.add_argument("--config", metavar="FILE",
+                                 help="Load processing code from FILE")
+        self.parser.add_argument("--upper", action="store_true",
+                                 help="Convert the request text to upper case")
+        self.parser.add_argument("--reverse", action="store_true",
+                                 help="Reverse the request text")
+        self.parser.add_argument("--append", metavar="STRING",
+                                 help="Append STRING to the request text")
 
         self.add_container_arguments()
         self.add_common_arguments()
@@ -91,9 +98,26 @@ class RespondCommand(Command):
                 self.error("Function 'process' not found in '{}'", config_file)
 
         self.max_count = self.args.count
+        self.upper = self.args.upper
+        self.reverse = self.args.reverse
+        self.append = self.args.append
 
     def process(self, request, response):
-        response.body = request.body
+        text = request.body
+
+        if text is None:
+            return
+
+        if self.upper:
+            text = text.upper()
+
+        if self.reverse:
+            text = "".join(reversed(text))
+
+        if self.append is not None:
+            text += self.append
+
+        response.body = text
 
 class _Handler(LinkHandler):
     def __init__(self, command):
@@ -135,6 +159,7 @@ class _Handler(LinkHandler):
             processing_succeeded = True
         except:
             processing_succeeded = False
+            _traceback.print_exc()
 
         self.processed_requests += 1
 
