@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/python
 #
 # Licensed to the Apache Software Foundation (ASF) under one
 # or more contributor license agreements.  See the NOTICE file
@@ -17,73 +17,102 @@
 # specific language governing permissions and limitations
 # under the License.
 #
-# -*- mode: sh; -*-
 
-set -e
+from plano import *
 
-if (( $# != 1 )); then
-    echo "Usage: qtools-test ADDRESS-URL"
-    exit 1
-fi
+import os
+import sys
 
-url=$1
-work_dir=$(mktemp -d)
-sender_id=container-$RANDOM
-receiver_id=container-$RANDOM
-sent_message=message-$RANDOM
-request_message=request-$RANDOM
+home_dir = os.path.normpath("@qtools_home@")
+sys.path.insert(0, os.path.join(home_dir, "python"))
 
-trap 'kill $(jobs -p)' SIGINT
+from plano import *
 
-qsend $OPTIONS $url --message $sent_message &
-received_message=$(qreceive $OPTIONS $url --count 1 --no-prefix)
+def start_message(args="", **kwargs):
+    return start_process("qmessage --verbose {}", args, **kwargs)
 
-if [[ $received_message != $sent_message ]]; then
-    exit 1
-fi
+def start_send(url, args="", **kwargs):
+    return start_process("qsend --verbose {} {}", url, args, **kwargs)
 
-qmessage --count 10 | qsend --id $sender_id $OPTIONS $url &
-qreceive --id $receiver_id $OPTIONS $url --count 10 >/dev/null
+def start_receive(url, args="", **kwargs):
+    return start_process("qreceive --verbose {} {}", url, args, **kwargs)
 
-qmessage --count 10 --rate 1000 | qsend $OPTIONS $url &
-qreceive $OPTIONS $url --count 10 >/dev/null
+def start_request(url, args="", **kwargs):
+    return start_process("qrequest --verbose {} {}", url, args, **kwargs)
 
-qmessage --count 1 --prop x y | qsend --presettled $OPTIONS $url &
-qreceive $OPTIONS $url --count 1 --json >/dev/null
+def start_respond(url, args="", **kwargs):
+    return start_process("qrespond --verbose {} {}", url, args, **kwargs)
 
-qrequest $OPTIONS $url --message $request_message > $work_dir/response_message &
-qrespond $OPTIONS $url --count 1
+def test_send_receive_args(url, message_args="", send_args="", receive_args="--count 1"):
+    output_file = make_temp_file()
 
-if [[ $(cat $work_dir/response_message) != $request_message ]]; then
-    exit 1
-fi
+    try:
+        with open(output_file, "w") as out:
+            message_proc = start_message(message_args, stdout=PIPE, stderr=out)
+            send_proc = start_send(url, stdin=message_proc.stdout, stderr=out)
+            receive_proc = start_receive(url, receive_args, stdout=PIPE, stderr=out)
 
-qrequest $OPTIONS $url --message abc > $work_dir/response_message &
-qrespond $OPTIONS $url --count 1 --config - <<EOF
-def process(request, response):
-    response.body = request.body.upper()
-EOF
+            output = receive_proc.communicate()[0]
 
-if [[ $(cat $work_dir/response_message) != ABC ]]; then
-    exit 1
-fi
+            check_process(message_proc)
+            check_process(send_proc)
+            check_process(receive_proc)
+    except CalledProcessError:
+        eprint(read(output_file), end="")
+        raise
 
-qrequest $OPTIONS $url --message abc > $work_dir/response_message &
-qrespond $OPTIONS $url --count 1 --upper --reverse --append " and this"
+    return output[:-1]
 
-if [[ $(cat $work_dir/response_message) != "CBA and this" ]]; then
-    exit 1
-fi
+def test_request_respond_args(url, message_args="", request_args="", respond_args="--count 1"):
+    output_file = make_temp_file()
 
-qmessage --count 10 | qrequest --id $sender_id $OPTIONS $url >/dev/null &
-qrespond --id $receiver_id $OPTIONS $url --count 10
+    try:
+        with open(output_file, "w") as out:
+            message_proc = start_message(message_args, stdout=PIPE, stderr=out)
+            request_proc = start_request(url, stdin=message_proc.stdout, stdout=PIPE, stderr=out)
+            respond_proc = start_respond(url, respond_args, stderr=out)
 
-qmessage --count 10 --rate 1000 | qrequest $OPTIONS $url >/dev/null &
-qrespond $OPTIONS $url --count 10
+            output = request_proc.communicate()[0]
 
-qmessage --count 1 --prop x y | qrequest --presettled --json $OPTIONS $url >/dev/null &
-qrespond $OPTIONS $url --count 1
+            check_process(message_proc)
+            check_process(request_proc)
+            check_process(respond_proc)
+    except CalledProcessError:
+        eprint(read(output_file), end="")
+        raise
 
-rm -rf $work_dir
+    return output[:-1]
 
-echo "qtools-test: PASSED"
+def test_send_receive(url):
+    output = test_send_receive_args(url, "--body abc123", "", "--count 1 --no-prefix")
+    assert output == "abc123", output
+
+    test_send_receive_args(url, "", "--presettled")
+    test_send_receive_args(url, "--id c1")
+    test_send_receive_args(url, "--count 10", "", "--count 10")
+    test_send_receive_args(url, "--count 10 --rate 1000", "", "--count 10")
+    test_send_receive_args(url, "--prop x y")
+
+def test_request_respond(url):
+    output = test_request_respond_args(url, "--body abc123", "", "--count 1 --reverse --upper --append ' and this'")
+    assert output == "321CBA and this", output
+
+    test_request_respond_args(url, "", "--presettled")
+    test_request_respond_args(url, "--id c1")
+    test_request_respond_args(url, "--count 10", "", "--count 10")
+    test_request_respond_args(url, "--count 10 --rate 1000", "", "--count 10")
+    test_request_respond_args(url, "--prop x y")
+
+def main():
+    set_message_threshold("warn")
+
+    url = sys.argv[1]
+
+    test_send_receive(url)
+    test_request_respond(url)
+
+if __name__ == "__main__":
+    try:
+        main()
+    except KeyboardInterrupt:
+        pass

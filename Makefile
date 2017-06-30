@@ -21,7 +21,8 @@ DESTDIR := ""
 PREFIX := ${HOME}/.local
 QTOOLS_HOME = ${PREFIX}/share/qtools
 
-export PATH := ${PWD}/install/bin:${PATH}
+export PATH := install/bin:${PATH}
+export PYTHONPATH := python
 
 .PHONY: default
 default: devel
