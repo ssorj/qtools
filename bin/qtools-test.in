@@ -69,57 +69,61 @@ def test_request_respond_args(out, url, message_args="", request_args="", respon
 
     return output[:-1]
 
-def test_send_receive(url):
-    output_file = make_temp_file()
+def test_send_receive(out, url):
+    body = test_send_receive_args(out, url, "--body abc123", "", "--count 1 --no-prefix")
+    assert body == "abc123", body
 
-    try:
-        with open(output_file, "w") as out:
-            body = test_send_receive_args(out, url, "--body abc123", "", "--count 1 --no-prefix")
-            assert body == "abc123", body
+    test_send_receive_args(out, url, "", "--presettled")
+    test_send_receive_args(out, url, "--id c1")
+    test_send_receive_args(out, url, "--count 10", "", "--count 10")
+    test_send_receive_args(out, url, "--count 10 --rate 1000", "", "--count 10")
+    test_send_receive_args(out, url, "--prop x y")
 
-            test_send_receive_args(out, url, "", "--presettled")
-            test_send_receive_args(out, url, "--id c1")
-            test_send_receive_args(out, url, "--count 10", "", "--count 10")
-            test_send_receive_args(out, url, "--count 10 --rate 1000", "", "--count 10")
-            test_send_receive_args(out, url, "--prop x y")
-    except CalledProcessError:
-        eprint(read(output_file), end="")
-        raise
+def test_request_respond(out, url):
+    body = test_request_respond_args(out, url, "--body abc123", "", "--count 1 --reverse --upper --append ' and this'")
+    assert body == "321CBA and this", body
 
-def test_request_respond(url):
-    output_file = make_temp_file()
+    test_request_respond_args(out, url, "", "--presettled")
+    test_request_respond_args(out, url, "--id c1")
+    test_request_respond_args(out, url, "--count 10", "", "--count 10")
+    test_request_respond_args(out, url, "--count 10 --rate 1000", "", "--count 10")
+    test_request_respond_args(out, url, "--prop x y")
 
-    try:
-        with open(output_file, "w") as out:
-            body = test_request_respond_args(out, url, "--body abc123", "", "--count 1 --reverse --upper --append ' and this'")
-            assert body == "321CBA and this", body
-
-            test_request_respond_args(out, url, "", "--presettled")
-            test_request_respond_args(out, url, "--id c1")
-            test_request_respond_args(out, url, "--count 10", "", "--count 10")
-            test_request_respond_args(out, url, "--count 10 --rate 1000", "", "--count 10")
-            test_request_respond_args(out, url, "--prop x y")
-    except CalledProcessError:
-        eprint(read(output_file), end="")
-        raise
-
-def run_test(url, name):
-    sys.stdout.write("{:.<73} ".format(name))
+def run_test(url, name, failures):
+    sys.stdout.write("{:.<73} ".format(name + " "))
 
     namespace = globals()
     function = namespace["test_{}".format(name)]
-    function(url)
 
-    print("DONE")
+    output_file = make_temp_file()
+
+    try:
+        with open(output_file, "w") as out:
+            function(out, url)
+    except CalledProcessError:
+        eprint(read(output_file), end="")
+
+        failures += 1
+
+        print("FAILED")
+
+    print("PASSED")
 
 def main():
     set_message_threshold("warn")
 
     url = sys.argv[1]
 
-    run_test(url, "send_receive")
-    run_test(url, "request_respond")
+    failures = 0
+    
+    run_test(url, "send_receive", failures)
+    run_test(url, "request_respond", failures)
 
+    if failures == 0:
+        print("All tests passed")
+    else:
+        fail("Some tests failed")
+    
 if __name__ == "__main__":
     try:
         main()
