@@ -48,6 +48,12 @@ def test_send_receive_args(out, url, message_args="", send_args="", receive_args
     send_proc = start_send(url, stdin=message_proc.stdout, stderr=out)
     receive_proc = start_receive(url, receive_args, stdout=PIPE, stderr=out)
 
+    check_process(message_proc)
+    check_process(send_proc)
+    check_process(receive_proc)
+
+    # XXX The receiver blocks indefinitely if qmessage or qsend fails
+
     output = receive_proc.communicate()[0]
 
     wait_for_process(message_proc)
@@ -60,6 +66,10 @@ def test_request_respond_args(out, url, message_args="", request_args="", respon
     message_proc = start_message(message_args, stdout=PIPE, stderr=out)
     request_proc = start_request(url, stdin=message_proc.stdout, stdout=PIPE, stderr=out)
     respond_proc = start_respond(url, respond_args, stderr=out)
+
+    check_process(message_proc)
+    check_process(request_proc)
+    check_process(respond_proc)
 
     output = request_proc.communicate()[0]
 
@@ -115,7 +125,7 @@ def main():
     url = sys.argv[1]
 
     failures = 0
-    
+
     run_test(url, "send_receive", failures)
     run_test(url, "request_respond", failures)
 
@@ -123,7 +133,7 @@ def main():
         print("All tests passed")
     else:
         fail("Some tests failed")
-    
+
 if __name__ == "__main__":
     try:
         main()
