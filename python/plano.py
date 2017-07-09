@@ -640,7 +640,10 @@ def wait_for_process(proc):
     return proc.returncode
 
 def check_process(proc):
-    exit_code = wait_for_process(proc)
+    exit_code = proc.poll()
+
+    if exit_code is None:
+        return
 
     if exit_code != 0:
         fail("{0} exited with code {1}", proc, proc.returncode)
