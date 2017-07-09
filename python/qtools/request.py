@@ -58,7 +58,7 @@ class RequestCommand(Command):
         self.parser.add_argument("--json", action="store_true",
                                  help="Write messages in JSON format")
         self.parser.add_argument("--presettled", action="store_true",
-                                 help="Send messages fire-and-forget (at-most-once delivery")
+                                 help="Send messages fire-and-forget (at-most-once delivery)")
 
         self.add_container_arguments()
         self.add_common_arguments()

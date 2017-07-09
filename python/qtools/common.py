@@ -402,7 +402,7 @@ def convert_message_to_data(message):
     if message.durable:
         _set_data_attribute(data, "durable", message, "durable")
 
-    if message.properties is not None:
+    if message.properties:
         props = data["properties"] = _collections.OrderedDict()
 
         for name in message.properties:
