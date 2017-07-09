@@ -39,7 +39,7 @@ class MessageCommand(Command):
 
         self.parser.description = _description
 
-        self.parser.add_argument("-o", "--output", metavar="FILE",
+        self.parser.add_argument("--output", metavar="FILE",
                                  help="Write messages to FILE (default stdout)")
         self.parser.add_argument("-c", "--count", metavar="COUNT", type=int,
                                  help="Exit after generating COUNT messages (default 1)")

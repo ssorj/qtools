@@ -51,14 +51,14 @@ class RequestCommand(Command):
         self.parser.add_argument("-m", "--message", metavar="CONTENT",
                                  action="append", default=list(),
                                  help="Send a request message containing CONTENT.  This option can be repeated.")
-        self.parser.add_argument("-i", "--input", metavar="FILE",
+        self.parser.add_argument("--input", metavar="FILE",
                                  help="Read request messages from FILE, one per line (default stdin)")
-        self.parser.add_argument("-o", "--output", metavar="FILE",
+        self.parser.add_argument("--output", metavar="FILE",
                                  help="Write response messages to FILE (default stdout)")
         self.parser.add_argument("--json", action="store_true",
                                  help="Write messages in JSON format")
         self.parser.add_argument("--presettled", action="store_true",
-                                 help="Send messages with at-most-once reliability")
+                                 help="Send messages fire-and-forget (at-most-once delivery")
 
         self.add_container_arguments()
         self.add_common_arguments()

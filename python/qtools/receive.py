@@ -47,7 +47,7 @@ class ReceiveCommand(Command):
 
         self.add_link_arguments()
 
-        self.parser.add_argument("-o", "--output", metavar="FILE",
+        self.parser.add_argument("--output", metavar="FILE",
                                  help="Write messages to FILE (default stdout)")
         self.parser.add_argument("--json", action="store_true",
                                  help="Write messages in JSON format")
