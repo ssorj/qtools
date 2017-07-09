@@ -46,8 +46,6 @@ address URLs:
   //localhost/queue0
   amqp://example.net:10000/jobs
   amqps://10.0.0.10/jobs/alpha
-
-  By default, SCHEME is 'amqp' and SERVER is '127.0.0.1:5672'.
 """
 
 class Command(object):
@@ -80,6 +78,12 @@ class Command(object):
         self.parser.add_argument("url", metavar="ADDRESS-URL", nargs="+",
                                  help="The location of a message source or target")
 
+    def add_connection_arguments(self):
+        self.parser.add_argument("--server", metavar="HOST[:PORT]", default="127.0.0.1:5672",
+                                 help="Use HOST[:PORT] as the default server (default 127.0.0.1:5672)")
+        self.parser.add_argument("--tls", action="store_true",
+                                 help="Connect using SSL/TLS authentication and encryption")
+
     def add_container_arguments(self):
         self.parser.add_argument("--id", metavar="ID",
                                  help="Set the container identity to ID")
@@ -98,6 +102,11 @@ class Command(object):
 
         self.args = self.parser.parse_args()
 
+    def init_link_attributes(self):
+        assert self.server is not None
+
+        self.urls = self.args.url
+
     def parse_address_url(self, address):
         url = _urlparse(address)
 
@@ -109,15 +118,21 @@ class Command(object):
         port = url.port
         path = url.path
 
-        if scheme is None:
-            scheme = "amqp"
+        default_scheme = "amqps" if self.tls_enabled else "amqp"
+
+        try:
+            default_host, default_port = self.server.split(":", 1)
+        except ValueError:
+            default_host, default_port = self.server, 5672
+
+        if not scheme:
+            scheme = default_scheme
 
         if host is None:
-            # XXX Should be "localhost" - a workaround for a proton issue
-            host = "127.0.0.1"
+            host = default_host
 
         if port is None:
-            port = 5672
+            port = default_port
 
         port = str(port)
 
@@ -126,21 +141,22 @@ class Command(object):
 
         return scheme, host, port, path
 
-    def init_link_attributes(self):
-        self.urls = self.args.url
+    def init_connection_attributes(self):
+        self.server = self.args.server
+        self.tls_enabled = self.args.tls
 
     def init_container_attributes(self):
         self.id = self.args.id
-
-    def init_common_attributes(self):
-        self.quiet = self.args.quiet
-        self.verbose = self.args.verbose
-        self.init_only = self.args.init_only
 
         if self.id is None:
             self.id = "{}-{}".format(self.name, unique_id())
 
         self.container.container_id = self.id
+
+    def init_common_attributes(self):
+        self.quiet = self.args.quiet
+        self.verbose = self.args.verbose
+        self.init_only = self.args.init_only
 
     def send_input(self, message):
         raise NotImplementedError()
@@ -237,6 +253,8 @@ class LinkHandler(_handlers.MessagingHandler):
         for url in self.command.urls:
             scheme, host, port, address = self.command.parse_address_url(url)
             connection_url = "{}://{}:{}".format(scheme, host, port)
+
+            self.command.info("Connecting to {}", connection_url)
 
             connection = event.container.connect(connection_url, allowed_mechs=b"ANONYMOUS")
             links = self.open_links(event, connection, address)

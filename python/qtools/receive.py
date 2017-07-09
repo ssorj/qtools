@@ -56,6 +56,7 @@ class ReceiveCommand(Command):
         self.parser.add_argument("-c", "--count", metavar="COUNT", type=int,
                                  help="Exit after receiving COUNT messages")
 
+        self.add_connection_arguments()
         self.add_container_arguments()
         self.add_common_arguments()
 
@@ -64,9 +65,10 @@ class ReceiveCommand(Command):
     def init(self):
         super(ReceiveCommand, self).init()
 
-        self.init_link_attributes()
-        self.init_container_attributes()
         self.init_common_attributes()
+        self.init_container_attributes()
+        self.init_connection_attributes()
+        self.init_link_attributes()
 
         self.output_file = _sys.stdout
         self.json = self.args.json

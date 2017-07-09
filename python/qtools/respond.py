@@ -69,6 +69,7 @@ class RespondCommand(Command):
         self.parser.add_argument("--append", metavar="STRING",
                                  help="Append STRING to the request text")
 
+        self.add_connection_arguments()
         self.add_container_arguments()
         self.add_common_arguments()
 
@@ -77,9 +78,10 @@ class RespondCommand(Command):
     def init(self):
         super(RespondCommand, self).init()
 
-        self.init_link_attributes()
-        self.init_container_attributes()
         self.init_common_attributes()
+        self.init_container_attributes()
+        self.init_connection_attributes()
+        self.init_link_attributes()
 
         if self.args.config is not None:
             config_file = self.args.config
