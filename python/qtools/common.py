@@ -50,21 +50,12 @@ address URLs:
   By default, SCHEME is 'amqp' and SERVER is '127.0.0.1:5672'.
 """
 
-class CommandError(Exception):
-    def __init__(self, message, *args):
-        if isinstance(message, Exception):
-            message = str(message)
-
-        message = message.format(*args)
-
-        super(CommandError, self).__init__(message)
-
 class Command(object):
     def __init__(self, home_dir):
         self.home_dir = home_dir
 
         self.parser = _argparse.ArgumentParser()
-        self.parser.formatter_class = _Formatter
+        self.parser.formatter_class = _argparse.RawDescriptionHelpFormatter
 
         self.args = None
 
@@ -107,6 +98,34 @@ class Command(object):
 
         self.args = self.parser.parse_args()
 
+    def parse_address_url(self, address):
+        url = _urlparse(address)
+
+        if url.path is None:
+            self.fail("The URL has no path")
+
+        scheme = url.scheme
+        host = url.hostname
+        port = url.port
+        path = url.path
+
+        if scheme is None:
+            scheme = "amqp"
+
+        if host is None:
+            # XXX Should be "localhost" - a workaround for a proton issue
+            host = "127.0.0.1"
+
+        if port is None:
+            port = 5672
+
+        port = str(port)
+
+        if path.startswith("/"):
+            path = path[1:]
+
+        return scheme, host, port, path
+
     def init_link_attributes(self):
         self.urls = self.args.url
 
@@ -137,9 +156,6 @@ class Command(object):
                 return
 
             self.run()
-        except CommandError as e:
-            self.error(str(e))
-            _sys.exit(1)
         except KeyboardInterrupt:
             pass
 
@@ -219,7 +235,7 @@ class LinkHandler(_handlers.MessagingHandler):
 
     def on_start(self, event):
         for url in self.command.urls:
-            scheme, host, port, address = parse_address_url(url)
+            scheme, host, port, address = self.command.parse_address_url(url)
             connection_url = "{}://{}:{}".format(scheme, host, port)
 
             connection = event.container.connect(connection_url, allowed_mechs=b"ANONYMOUS")
@@ -345,34 +361,6 @@ def plural(word, count, override=None):
 
     return word + "s"
 
-def parse_address_url(address):
-    url = _urlparse(address)
-
-    if url.path is None:
-        raise CommandError("The URL has no path")
-
-    scheme = url.scheme
-    host = url.hostname
-    port = url.port
-    path = url.path
-
-    if scheme is None:
-        scheme = "amqp"
-
-    if host is None:
-        # XXX Should be "localhost" - a workaround for a proton issue
-        host = "127.0.0.1"
-
-    if port is None:
-        port = 5672
-
-    port = str(port)
-
-    if path.startswith("/"):
-        path = path[1:]
-
-    return scheme, host, port, path
-
 def convert_data_to_message(data):
     message = _proton.Message()
 
@@ -432,6 +420,3 @@ def _set_data_attribute(data, dname, message, mname, omit_if_empty=True):
         return
 
     data[dname] = getattr(message, mname)
-
-class _Formatter(_argparse.RawDescriptionHelpFormatter):
-    pass
