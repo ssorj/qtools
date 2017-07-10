@@ -65,8 +65,6 @@ class RequestCommand(MessagingCommand):
 
         self.init_link_attributes()
 
-        self.input_file = _sys.stdin
-        self.output_file = _sys.stdout
         self.json = self.args.json
         self.presettled = self.args.presettled
 
