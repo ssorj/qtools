@@ -80,19 +80,25 @@ Tools that read from or write to the console take these options.
     --input FILE          Read input from FILE
     --output FILE         Write output to FILE
 
-## Unfiled
+### The `qsend` and `qreceive` commands
 
     qsend [SCHEME:][//SERVER/]ADDRESS --message MESSAGE
 
     qreceive [SCHEME:][//SERVER/]ADDRESS --count 1
     -> MESSAGE
 
+### The `qrequest` and `qrespond` commands
+
     qrequest [SCHEME:][//SERVER/]ADDRESS --message REQUEST
     -> RESPONSE
 
     qrespond [SCHEME:][//SERVER/]ADDRESS --count 1
 
+### The `qmessage` command
+
     qmessage --count 1 --id ID --body CONTENT
     -> MESSAGE
+
+### The `qbroker` command
 
     qbroker [--host HOST] [--port PORT]

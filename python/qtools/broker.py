@@ -30,6 +30,7 @@ import proton.reactor as _reactor
 import uuid as _uuid
 
 from .common import *
+from .common import _summarize
 
 _description = "An AMQP message broker for testing"
 
@@ -194,9 +195,9 @@ class _BrokerHandler(_handlers.MessagingHandler):
         delivery = event.delivery
 
         template = "{} {{}} {} to {}"
-        template = template.format(summarize(event.connection),
-                                   summarize(delivery),
-                                   summarize(event.link.source))
+        template = template.format(_summarize(event.connection),
+                                   _summarize(delivery),
+                                   _summarize(event.link.source))
 
         if delivery.remote_state == delivery.ACCEPTED:
             self.command.info(template, "accepted")
