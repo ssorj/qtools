@@ -63,7 +63,6 @@ class SendCommand(Command):
         self.container.handler = _Handler(self)
 
         self.messages = _collections.deque()
-        self.input_thread = InputThread(self)
 
     def init(self):
         super(SendCommand, self).init()

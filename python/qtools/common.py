@@ -71,6 +71,7 @@ class Command(object):
                 self.name = arg.rsplit("/", 1)[-1]
                 break
 
+        self.input_thread = _InputThread(self)
         self.ready = _threading.Event()
         self.done = _threading.Event()
 
@@ -101,6 +102,23 @@ class Command(object):
         assert self.args is None
 
         self.args = self.parser.parse_args()
+
+    def init_common_attributes(self):
+        self.quiet = self.args.quiet
+        self.verbose = self.args.verbose
+        self.init_only = self.args.init_only
+
+    def init_container_attributes(self):
+        self.id = self.args.id
+
+        if self.id is None:
+            self.id = "{}-{}".format(self.name, unique_id())
+
+        self.container.container_id = self.id
+
+    def init_connection_attributes(self):
+        self.server = self.args.server
+        self.tls_enabled = self.args.tls
 
     def init_link_attributes(self):
         assert self.server is not None
@@ -140,23 +158,6 @@ class Command(object):
             path = path[1:]
 
         return scheme, host, port, path
-
-    def init_connection_attributes(self):
-        self.server = self.args.server
-        self.tls_enabled = self.args.tls
-
-    def init_container_attributes(self):
-        self.id = self.args.id
-
-        if self.id is None:
-            self.id = "{}-{}".format(self.name, unique_id())
-
-        self.container.container_id = self.id
-
-    def init_common_attributes(self):
-        self.quiet = self.args.quiet
-        self.verbose = self.args.verbose
-        self.init_only = self.args.init_only
 
     def send_input(self, message):
         raise NotImplementedError()
@@ -205,7 +206,7 @@ class Command(object):
         _sys.stderr.write("{}\n".format(message))
         _sys.stderr.flush()
 
-class InputThread(_threading.Thread):
+class _InputThread(_threading.Thread):
     def __init__(self, command):
         _threading.Thread.__init__(self)
 
