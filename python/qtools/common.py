@@ -57,11 +57,6 @@ class Command(object):
 
         self.args = None
 
-        self.container = _reactor.Container()
-        self.events = _reactor.EventInjector()
-
-        self.container.selectable(self.events)
-
         self.quiet = False
         self.verbose = False
         self.init_only = False
@@ -71,7 +66,13 @@ class Command(object):
                 self.name = arg.rsplit("/", 1)[-1]
                 break
 
+        self.container = _reactor.Container()
+        self.events = _reactor.EventInjector()
+        self.container.selectable(self.events)
+
         self.input_thread = _InputThread(self)
+        self.input_messages = _collections.deque()
+
         self.ready = _threading.Event()
         self.done = _threading.Event()
 
@@ -160,7 +161,8 @@ class Command(object):
         return scheme, host, port, path
 
     def send_input(self, message):
-        raise NotImplementedError()
+        self.input_messages.appendleft(message)
+        self.events.trigger(_reactor.ApplicationEvent("input"))
 
     def run(self):
         self.container.run()

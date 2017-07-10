@@ -69,6 +69,8 @@ def test_request_respond_args(out, url, message_args="", request_args="", respon
     check_process(request_proc)
     check_process(respond_proc)
 
+    # XXX The requester blocks indefinitely if qmessage or qsend fails
+
     output = request_proc.communicate()[0]
 
     wait_for_process(message_proc)
@@ -108,6 +110,8 @@ def run_test(url, name, failures):
     try:
         with open(output_file, "w") as out:
             function(out, url)
+            # XXX
+            #function(sys.stdout, url)
     except CalledProcessError:
         eprint(read(output_file), end="")
 

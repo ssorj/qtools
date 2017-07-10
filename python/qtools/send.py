@@ -62,8 +62,6 @@ class SendCommand(Command):
 
         self.container.handler = _Handler(self)
 
-        self.messages = _collections.deque()
-
     def init(self):
         super(SendCommand, self).init()
 
@@ -82,16 +80,11 @@ class SendCommand(Command):
             message = _proton.Message(unicode(value))
             self.send_input(message)
 
-        if self.messages:
+        if self.input_messages:
             self.send_input(None)
-
-    def send_input(self, message):
-        self.messages.appendleft(message)
-        self.events.trigger(_reactor.ApplicationEvent("input"))
 
     def run(self):
         self.input_thread.start()
-
         super(SendCommand, self).run()
 
 class _Handler(LinkHandler):
@@ -138,7 +131,7 @@ class _Handler(LinkHandler):
             return
 
         try:
-            message = self.command.messages.pop()
+            message = self.command.input_messages.pop()
         except IndexError:
             return
 
@@ -160,7 +153,7 @@ class _Handler(LinkHandler):
             self.senders.appendleft(sender)
 
         if not sender.credit:
-            self.command.messages.append(message)
+            self.command.input_messages.append(message)
             return
 
         if message.address is None:
