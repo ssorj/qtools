@@ -26,6 +26,7 @@ from __future__ import with_statement
 import argparse as _argparse
 import binascii as _binascii
 import collections as _collections
+import commandante as _commandante
 import json as _json
 import proton as _proton
 import proton.handlers as _handlers
@@ -48,68 +49,38 @@ address URLs:
   amqps://10.0.0.10/jobs/alpha
 """
 
-class Command(object):
-    def __init__(self, home_dir):
-        self.home_dir = home_dir
+class MessagingCommand(_commandante.Command):
+    def __init__(self, home_dir, name, handler):
+        super(MessagingCommand, self).__init__(home_dir, name)
 
-        self.parser = _argparse.ArgumentParser()
-        self.parser.formatter_class = _argparse.RawDescriptionHelpFormatter
+        self.container = _reactor.Container(handler)
 
-        self.args = None
-
-        self.quiet = False
-        self.verbose = False
-        self.init_only = False
-
-        for arg in _sys.argv:
-            if "=" not in arg:
-                self.name = arg.rsplit("/", 1)[-1]
-                break
-
-        self.container = _reactor.Container()
         self.events = _reactor.EventInjector()
         self.container.selectable(self.events)
 
+        self.input_file = _sys.stdin
         self.input_thread = _InputThread(self)
         self.input_messages = _collections.deque()
+
+        self.output_file = _sys.stdout
 
         self.ready = _threading.Event()
         self.done = _threading.Event()
 
+        self.add_argument("--id", metavar="ID",
+                          help="Set the container identity to ID")
+
     def add_link_arguments(self):
-        self.parser.add_argument("url", metavar="ADDRESS-URL", nargs="+",
-                                 help="The location of a message source or target")
-
-    def add_connection_arguments(self):
-        self.parser.add_argument("--server", metavar="HOST[:PORT]", default="127.0.0.1:5672",
-                                 help="Use HOST[:PORT] as the default server (default 127.0.0.1:5672)")
-        self.parser.add_argument("--tls", action="store_true",
-                                 help="Connect using SSL/TLS authentication and encryption")
-
-    def add_container_arguments(self):
-        self.parser.add_argument("--id", metavar="ID",
-                                 help="Set the container identity to ID")
-
-    def add_common_arguments(self):
-        self.parser.add_argument("--quiet", action="store_true",
-                                 help="Print no logging to the console")
-        self.parser.add_argument("--verbose", action="store_true",
-                                 help="Print detailed logging to the console")
-        self.parser.add_argument("--init-only", action="store_true",
-                                 help=_argparse.SUPPRESS)
+        self.add_argument("url", metavar="ADDRESS-URL", nargs="+",
+                          help="The location of a message source or target")
+        self.add_argument("--server", metavar="HOST[:PORT]", default="127.0.0.1:5672",
+                          help="Use HOST[:PORT] as the default server (default 127.0.0.1:5672)")
+        self.add_argument("--tls", action="store_true",
+                          help="Connect using SSL/TLS authentication and encryption")
 
     def init(self):
-        assert self.parser is not None
-        assert self.args is None
+        super(MessagingCommand, self).init()
 
-        self.args = self.parser.parse_args()
-
-    def init_common_attributes(self):
-        self.quiet = self.args.quiet
-        self.verbose = self.args.verbose
-        self.init_only = self.args.init_only
-
-    def init_container_attributes(self):
         self.id = self.args.id
 
         if self.id is None:
@@ -117,13 +88,9 @@ class Command(object):
 
         self.container.container_id = self.id
 
-    def init_connection_attributes(self):
+    def init_link_attributes(self):
         self.server = self.args.server
         self.tls_enabled = self.args.tls
-
-    def init_link_attributes(self):
-        assert self.server is not None
-
         self.urls = self.args.url
 
     def parse_address_url(self, address):
@@ -167,50 +134,15 @@ class Command(object):
     def run(self):
         self.container.run()
 
-    def main(self):
-        try:
-            self.init()
-
-            if self.init_only:
-                return
-
-            self.run()
-        except KeyboardInterrupt:
-            pass
-
-    def info(self, message, *args):
-        if self.verbose:
-            self._print_message(message, args)
-
-    def notice(self, message, *args):
-        if not self.quiet:
-            self._print_message(message, args)
-
-    def warn(self, message, *args):
-        message = "Warning! {}".format(message)
-
-        self._print_message(message, args)
-
-    def error(self, message, *args):
-        message = "Error! {}".format(message)
-
-        self._print_message(message, args)
-
-        _sys.exit(1)
-
-    def _print_message(self, message, args):
+    def print(self, message, *args):
         summarized_args = [_summarize(x) for x in args]
-
-        message = message[0].upper() + message[1:]
-        message = message.format(*summarized_args)
-        message = "{}: {}".format(self.id, message)
-
-        _sys.stderr.write("{}\n".format(message))
-        _sys.stderr.flush()
+        super(MessagingCommand, self).print(message, *summarized_args)
 
 class _InputThread(_threading.Thread):
     def __init__(self, command):
         _threading.Thread.__init__(self)
+
+        assert isinstance(command, MessagingCommand)
 
         self.command = command
         self.daemon = True

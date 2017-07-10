@@ -38,39 +38,29 @@ example usage:
   $ qreceive queue0 queue1 > messages.txt
 """
 
-class ReceiveCommand(Command):
+class ReceiveCommand(MessagingCommand):
     def __init__(self, home_dir):
-        super(ReceiveCommand, self).__init__(home_dir)
+        super(ReceiveCommand, self).__init__(home_dir, "qreceive", _Handler(self))
 
-        self.parser.description = _description
-        self.parser.epilog = url_epilog + _epilog
+        self.description = _description
+        self.epilog = url_epilog + _epilog
 
         self.add_link_arguments()
 
-        self.parser.add_argument("--output", metavar="FILE",
-                                 help="Write messages to FILE (default stdout)")
-        self.parser.add_argument("--json", action="store_true",
-                                 help="Write messages in JSON format")
-        self.parser.add_argument("--no-prefix", action="store_true",
-                                 help="Suppress address prefix")
-        self.parser.add_argument("-c", "--count", metavar="COUNT", type=int,
-                                 help="Exit after receiving COUNT messages")
-
-        self.add_connection_arguments()
-        self.add_container_arguments()
-        self.add_common_arguments()
-
-        self.container.handler = _Handler(self)
+        self.add_argument("--output", metavar="FILE",
+                          help="Write messages to FILE (default stdout)")
+        self.add_argument("--json", action="store_true",
+                          help="Write messages in JSON format")
+        self.add_argument("--no-prefix", action="store_true",
+                          help="Suppress address prefix")
+        self.add_argument("-c", "--count", metavar="COUNT", type=int,
+                          help="Exit after receiving COUNT messages")
 
     def init(self):
         super(ReceiveCommand, self).init()
 
-        self.init_common_attributes()
-        self.init_container_attributes()
-        self.init_connection_attributes()
         self.init_link_attributes()
 
-        self.output_file = _sys.stdout
         self.json = self.args.json
         self.no_prefix = self.args.no_prefix
         self.max_count = self.args.count

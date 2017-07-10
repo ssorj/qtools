@@ -34,37 +34,24 @@ from .common import _summarize
 
 _description = "An AMQP message broker for testing"
 
-class BrokerCommand(Command):
+class BrokerCommand(MessagingCommand):
     def __init__(self, home_dir):
-        super(BrokerCommand, self).__init__(home_dir)
+        super(BrokerCommand, self).__init__(home_dir, "qbroker", _Handler(self))
 
-        self.parser.description = _description
+        self.description = _description
 
-        self.parser.add_argument("--host", metavar="HOST", default="127.0.0.1",
-                                 help="Listen on HOST (default 127.0.0.1)")
-        self.parser.add_argument("--port", metavar="PORT", default=5672,
-                                 help="Listen on PORT (default 5672)")
-
-        self.add_container_arguments()
-        self.add_common_arguments()
+        self.add_argument("--host", metavar="HOST", default="127.0.0.1",
+                          help="Listen on HOST (default 127.0.0.1)")
+        self.add_argument("--port", metavar="PORT", default=5672,
+                          help="Listen on PORT (default 5672)")
 
     def init(self):
         super(BrokerCommand, self).init()
 
-        self.init_container_attributes()
-        self.init_common_attributes()
-
         self.host = self.args.host
         self.port = self.args.port
 
-    def run(self):
-        handler = _BrokerHandler(self)
-        container = _reactor.Container(handler)
-
-        container.container_id = self.id
-        container.run()
-
-class _BrokerQueue(object):
+class _Queue(object):
     def __init__(self, command, address):
         self.command = command
         self.address = address
@@ -113,9 +100,9 @@ class _BrokerQueue(object):
 
             self.command.notice("Forwarded {} on {} to {}", message, self, link.connection)
 
-class _BrokerHandler(_handlers.MessagingHandler):
+class _Handler(_handlers.MessagingHandler):
     def __init__(self, command):
-        super(_BrokerHandler, self).__init__()
+        super(_Handler, self).__init__()
 
         self.command = command
         self.queues = dict()
@@ -132,7 +119,7 @@ class _BrokerHandler(_handlers.MessagingHandler):
         try:
             queue = self.queues[address]
         except KeyError:
-            queue = self.queues[address] = _BrokerQueue(self.command, address)
+            queue = self.queues[address] = _Queue(self.command, address)
 
         return queue
 

@@ -39,38 +39,28 @@ example usage:
   $ qsend queue0 queue1 < messages.txt
 """
 
-class SendCommand(Command):
+class SendCommand(MessagingCommand):
     def __init__(self, home_dir):
-        super(SendCommand, self).__init__(home_dir)
+        super(SendCommand, self).__init__(home_dir, "qsend", _Handler(self))
 
-        self.parser.description = _description
-        self.parser.epilog = url_epilog + _epilog
+        self.description = _description
+        self.epilog = url_epilog + _epilog
 
         self.add_link_arguments()
 
-        self.parser.add_argument("-m", "--message", metavar="CONTENT",
-                                 action="append", default=list(),
-                                 help="Send a message containing CONTENT.  This option can be repeated.")
-        self.parser.add_argument("--input", metavar="FILE",
-                                 help="Read messages from FILE, one per line (default stdin)")
-        self.parser.add_argument("--presettled", action="store_true",
-                                 help="Send messages fire-and-forget (at-most-once delivery)")
-
-        self.add_connection_arguments()
-        self.add_container_arguments()
-        self.add_common_arguments()
-
-        self.container.handler = _Handler(self)
+        self.add_argument("-m", "--message", metavar="CONTENT",
+                          action="append", default=list(),
+                          help="Send a message containing CONTENT.  This option can be repeated.")
+        self.add_argument("--input", metavar="FILE",
+                          help="Read messages from FILE, one per line (default stdin)")
+        self.add_argument("--presettled", action="store_true",
+                          help="Send messages fire-and-forget (at-most-once delivery)")
 
     def init(self):
         super(SendCommand, self).init()
 
-        self.init_common_attributes()
-        self.init_container_attributes()
-        self.init_connection_attributes()
         self.init_link_attributes()
 
-        self.input_file = _sys.stdin
         self.presettled = self.args.presettled
 
         if self.args.input is not None:

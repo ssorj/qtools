@@ -49,38 +49,29 @@ example usage:
   $ qrespond queue0 queue1
 """
 
-class RespondCommand(Command):
+class RespondCommand(MessagingCommand):
     def __init__(self, home_dir):
-        super(RespondCommand, self).__init__(home_dir)
+        super(RespondCommand, self).__init__(home_dir, "qrespond", _Handler(self))
 
-        self.parser.description = _description
-        self.parser.epilog = url_epilog + _epilog
+        self.description = _description
+        self.epilog = url_epilog + _epilog
 
         self.add_link_arguments()
 
-        self.parser.add_argument("-c", "--count", metavar="COUNT", type=int,
-                                 help="Exit after processing COUNT requests")
-        self.parser.add_argument("--config", metavar="FILE",
-                                 help="Load processing code from FILE")
-        self.parser.add_argument("--upper", action="store_true",
-                                 help="Convert the request text to upper case")
-        self.parser.add_argument("--reverse", action="store_true",
-                                 help="Reverse the request text")
-        self.parser.add_argument("--append", metavar="STRING",
-                                 help="Append STRING to the request text")
-
-        self.add_connection_arguments()
-        self.add_container_arguments()
-        self.add_common_arguments()
-
-        self.container.handler = _Handler(self)
+        self.add_argument("-c", "--count", metavar="COUNT", type=int,
+                          help="Exit after processing COUNT requests")
+        self.add_argument("--config", metavar="FILE",
+                          help="Load processing code from FILE")
+        self.add_argument("--upper", action="store_true",
+                          help="Convert the request text to upper case")
+        self.add_argument("--reverse", action="store_true",
+                          help="Reverse the request text")
+        self.add_argument("--append", metavar="STRING",
+                          help="Append STRING to the request text")
 
     def init(self):
         super(RespondCommand, self).init()
 
-        self.init_common_attributes()
-        self.init_container_attributes()
-        self.init_connection_attributes()
         self.init_link_attributes()
 
         if self.args.config is not None:
