@@ -163,7 +163,7 @@ class _Handler(LinkHandler):
             self.senders.appendleft(sender)
 
         if not sender.credit:
-            self.command.messages.append(message)
+            self.command.input_messages.append(message)
             return
 
         receiver = self.receivers_by_sender[sender]

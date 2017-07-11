@@ -62,5 +62,5 @@ test: devel
 
 .PHONY: big-test
 big-test: test
-	qtools-test //amqp.zone/queue-$$RANDOM
-	qtools-test amqps://messaging-enmasse.34.210.100.115.nip.io:443/myqueue
+	qtools-test //amqp.zone/queue-$(shell echo $$RANDOM)
+#	qtools-test amqps://messaging-enmasse.34.210.100.115.nip.io:443/myqueue
