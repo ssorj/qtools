@@ -90,6 +90,11 @@ These commands perform one-way message transfers.
     qreceive URL --count 1
     -> MESSAGE
 
+The send command reads messages, one per line, from standard input.
+Alternatively, you can input messages using the `--message` option.
+The receive command prints each message it receives to standard
+output.
+
 Typical usage:
 
     $ qsend //amqp.zone/queue1 --message m1 &
@@ -106,6 +111,9 @@ responses.
     -> RESPONSE
 
     qrespond URL --count 1
+
+The request command reads request messages from standard input and
+writes responses to standard output.
 
 Typical usage:
 
