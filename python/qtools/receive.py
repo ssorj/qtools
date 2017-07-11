@@ -51,6 +51,8 @@ class ReceiveCommand(MessagingCommand):
                           help="Write messages to FILE (default stdout)")
         self.add_argument("--json", action="store_true",
                           help="Write messages in JSON format")
+        self.add_argument("--annotations", action="store_true",
+                          help="Print delivery and message metadata")
         self.add_argument("--no-prefix", action="store_true",
                           help="Suppress address prefix")
         self.add_argument("-c", "--count", metavar="COUNT", type=int,
@@ -62,6 +64,7 @@ class ReceiveCommand(MessagingCommand):
         self.init_link_attributes()
 
         self.json = self.args.json
+        self.annotations = self.args.annotations
         self.no_prefix = self.args.no_prefix
         self.max_count = self.args.count
 
@@ -83,20 +86,40 @@ class _Handler(LinkHandler):
 
         self.received_messages += 1
 
+        message = event.message
+
+        if self.command.annotations:
+            if message.instructions is not None:
+                self.command.output_file.write("[delivery annotations]\n")
+
+                for name in sorted(message.instructions):
+                    value = message.instructions[name]
+                    self.command.output_file.write("{}: {}\n".format(name, value))
+
+            if message.annotations is not None:
+                self.command.output_file.write("[message annotations]\n")
+
+                for name in sorted(message.annotations):
+                    value = message.annotations[name]
+                    self.command.output_file.write("{}: {}\n".format(name, value))
+
+            if message.instructions is not None or message.annotations is not None:
+                self.command.output_file.write("[message]\n")
+
         if not self.command.no_prefix:
             prefix = event.link.source.address + ": "
             self.command.output_file.write(prefix)
 
         if self.command.json:
-            data = convert_message_to_data(event.message)
+            data = convert_message_to_data(message)
             _json.dump(data, self.command.output_file)
         else:
-            self.command.output_file.write(event.message.body)
+            self.command.output_file.write(message.body)
 
         self.command.output_file.write("\n")
 
         self.command.info("Received {} from {} on {}",
-                          event.message,
+                          message,
                           event.link.source,
                           event.connection)
 
