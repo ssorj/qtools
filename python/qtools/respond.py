@@ -131,7 +131,7 @@ class _Handler(LinkHandler):
         return receiver, sender
 
     def on_message(self, event):
-        if self.processed_requests == self.command.max_count:
+        if self.command.done.is_set():
             return
 
         delivery = event.delivery
@@ -172,6 +172,7 @@ class _Handler(LinkHandler):
             self.reject(delivery)
 
         if self.processed_requests == self.command.max_count:
+            self.command.done.set()
             self.close()
 
     def close(self):

@@ -32,6 +32,7 @@ import proton as _proton
 import proton.handlers as _handlers
 import proton.reactor as _reactor
 import sys as _sys
+import time as _time
 import threading as _threading
 import uuid as _uuid
 
@@ -60,9 +61,9 @@ class MessagingCommand(_commandant.Command):
 
         self.input_file = _sys.stdin
         self.input_thread = _InputThread(self)
-        self.input_messages = _collections.deque()
 
         self.output_file = _sys.stdout
+        self.output_thread = _OutputThread(self)
 
         self.ready = _threading.Event()
         self.done = _threading.Event()
@@ -127,10 +128,6 @@ class MessagingCommand(_commandant.Command):
 
         return scheme, host, port, path
 
-    def send_input(self, message):
-        self.input_messages.appendleft(message)
-        self.events.trigger(_reactor.ApplicationEvent("input"))
-
     def run(self):
         self.container.run()
 
@@ -138,40 +135,98 @@ class MessagingCommand(_commandant.Command):
         summarized_args = [_summarize(x) for x in args]
         super(MessagingCommand, self).print(message, *summarized_args)
 
-class _InputThread(_threading.Thread):
+class _InputOutputThread(_threading.Thread):
     def __init__(self, command):
         _threading.Thread.__init__(self)
 
         assert isinstance(command, MessagingCommand)
 
         self.command = command
-        self.daemon = True
+        self.name = self.__class__.__name__
+        self.daemon = True # XXX Correct?
 
+        self.messages = _collections.deque()
+
+    def send(self, message):
+        self.messages.appendleft(message)
+
+class _InputThread(_InputOutputThread):
     def run(self):
         self.command.ready.wait()
 
         with self.command.input_file as f:
             while True:
-                if self.command.done.is_set():
+                #if self.command.done.is_set():
+                #    break
+
+                message = self.read_input(f)
+
+                if message is None:
                     break
 
-                string = f.readline()
+                self.send(message)
 
-                if string == "":
-                    self.command.send_input(None)
+        self.command.events.trigger(_reactor.ApplicationEvent("input_done"))
+        self.command.print("Fired input done")
+
+    def send(self, message):
+        super(_InputThread, self).send(message)
+        self.command.events.trigger(_reactor.ApplicationEvent("input"))
+
+    def read_input(self, file_):
+        string = file_.readline()
+
+        if string == "":
+            return
+
+        if string.endswith("\n"):
+            string = string[:-1]
+
+        if string.startswith("{") and string.endswith("}"):
+            data = _json.loads(string)
+            message = convert_data_to_message(data)
+        else:
+            string = unicode(string)
+            message = _proton.Message(string)
+
+        return message
+
+class _OutputThread(_InputOutputThread):
+    def run(self):
+        self.command.ready.wait()
+
+        with self.command.output_file as f:
+            while True:
+                try:
+                    record = self.messages.pop()
+                except IndexError:
+                    _time.sleep(1)
+                    continue
+
+                if record is None:
                     break
 
-                if string.endswith("\n"):
-                    string = string[:-1]
+                delivery, message = record
 
-                if string.startswith("{") and string.endswith("}"):
-                    data = _json.loads(string)
-                    message = convert_data_to_message(data)
-                else:
-                    string = unicode(string)
-                    message = _proton.Message(string)
+                self.write_output(f, delivery, message)
 
-                self.command.send_input(message)
+            f.flush()
+
+        self.command.events.trigger(_reactor.ApplicationEvent("output_done"))
+        self.command.print("Fired output done")
+
+    def write_output(self, file_, delivery, message):
+        if not self.command.no_prefix:
+            prefix = delivery.link.source.address + ": "
+            file_.write(prefix)
+
+        if self.command.json:
+            data = convert_message_to_data(message)
+            _json.dump(data, file_)
+        else:
+            file_.write(message.body)
+
+        file_.write("\n")
 
 class LinkHandler(_handlers.MessagingHandler):
     def __init__(self, command, **kwargs):
@@ -223,6 +278,20 @@ class LinkHandler(_handlers.MessagingHandler):
         if self.opened_links == len(self.links):
             self.command.ready.set()
 
+    def on_input_done(self, event):
+        if self.command.presettled:
+            self.close()
+        else:
+            self.command.done.set()
+
+        self.command.print("Handled input done")
+
+    def on_output_done(self, event):
+        assert self.command.done.is_set()
+        self.close()
+
+        self.command.print("Handled output done")
+        
     def on_settled(self, event):
         delivery = event.delivery
 
@@ -241,12 +310,12 @@ class LinkHandler(_handlers.MessagingHandler):
             self.command.notice(template, "modified")
 
     def close(self):
-        self.command.done.set()
-
         for connection in self.connections:
             connection.close()
 
         self.command.events.close()
+
+        self.command.print("Main thread closed")
 
 def _summarize(entity):
     if isinstance(entity, _proton.Connection):
@@ -381,3 +450,27 @@ def _set_data_attribute(data, dname, message, mname, omit_if_empty=True):
         return
 
     data[dname] = getattr(message, mname)
+
+import os
+import sys
+
+def print_threads(writer=sys.stderr):
+    #row = "%-20.20s  %-20.20s  %-12.12s  %-8s  %-8s  %s"
+    row = "{:20.20}  {:20.20}  {:<16}  {:<8}  {:<8}  {}"
+
+    writer.write("-" * 78)
+    writer.write(os.linesep)
+    writer.write(row.format("Class", "Name", "Ident", "Alive", "Daemon", ""))
+    writer.write(os.linesep)
+    writer.write("-" * 78)
+    writer.write(os.linesep)
+
+    for thread in sorted(_threading.enumerate()):
+        cls = thread.__class__.__name__
+        name = thread.name
+        ident = thread.ident
+        alive = thread.is_alive()
+        daemon = thread.daemon
+
+        writer.write(row.format(cls, name, ident, alive, daemon, ""))
+        writer.write(os.linesep)

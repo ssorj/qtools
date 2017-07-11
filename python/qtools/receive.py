@@ -78,6 +78,10 @@ class ReceiveCommand(MessagingCommand):
         if self.args.output is not None:
             self.output_file = open(self.args.output, "w")
 
+    def run(self):
+        self.output_thread.start()
+        super(ReceiveCommand, self).run()
+
 class _Handler(LinkHandler):
     def __init__(self, command):
         super(_Handler, self).__init__(command)
@@ -88,7 +92,7 @@ class _Handler(LinkHandler):
         return event.container.create_receiver(connection, address),
 
     def on_message(self, event):
-        if self.received_messages == self.command.max_count:
+        if self.command.done.is_set():
             return
 
         self.received_messages += 1
@@ -138,8 +142,8 @@ class _Handler(LinkHandler):
                           event.connection)
 
         if self.received_messages == self.command.max_count:
-            self.command.output_file.flush()
-            self.close()
+            self.command.done.set()
+            self.command.output_thread.send(None)
 
     def close(self):
         super(_Handler, self).close()
@@ -148,7 +152,11 @@ class _Handler(LinkHandler):
                             self.received_messages,
                             plural("message", self.received_messages))
 
+        print_threads()
+
     def write(self, template=None, *args):
+        #self.command.output_thread.send((event.delivery, event.message))
+
         if template is None:
             return
 

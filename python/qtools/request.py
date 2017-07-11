@@ -74,15 +74,17 @@ class RequestCommand(MessagingCommand):
         if self.args.output is not None:
             self.output_file = open(self.args.output, "w")
 
-        for value in self.args.message:
-            message = _proton.Message(unicode(value))
-            self.send_input(message)
+        if self.args.message:
+            for value in self.args.message:
+                message = _proton.Message(unicode(value))
+                self.input_thread.send(message)
 
-        if self.input_messages:
-            self.send_input(None)
+            self.input_thread.close()
 
     def run(self):
         self.input_thread.start()
+        self.output_thread.start()
+
         super(RequestCommand, self).run()
 
 class _Handler(LinkHandler):
@@ -110,50 +112,22 @@ class _Handler(LinkHandler):
 
         return sender, receiver
 
-    def on_sendable(self, event):
-        self.send_request(event)
-
     def on_input(self, event):
-        self.send_request(event)
+        self.send_message(event)
 
-    def on_message(self, event):
-        self.received_responses += 1
+    def on_sendable(self, event):
+        self.send_message(event)
 
-        if self.command.json:
-            data = convert_message_to_data(event.message)
-            _json.dump(data, self.command.output_file)
-        else:
-            self.command.output_file.write(event.message.body)
-
-        self.command.output_file.write("\n")
-
-        self.command.info("Received response {} from {} on {}",
-                          event.message,
-                          event.link.source,
-                          event.connection)
-
-        if self.stop_requested and self.sent_requests == self.received_responses:
-            self.command.output_file.flush()
-            self.close()
-
-    def send_request(self, event):
-        if self.stop_requested:
+    def send_message(self, event):
+        if self.command.done.is_set():
             return
 
         if not self.command.ready.is_set():
             return
 
         try:
-            message = self.command.input_messages.pop()
+            message = self.command.input_thread.messages.pop()
         except IndexError:
-            return
-
-        if message is None:
-            if self.sent_requests == self.received_responses:
-                self.close()
-            else:
-                self.stop_requested = True
-
             return
 
         sender = event.link
@@ -163,7 +137,7 @@ class _Handler(LinkHandler):
             self.senders.appendleft(sender)
 
         if not sender.credit:
-            self.command.input_messages.append(message)
+            self.command.input_thread.messages.append(message)
             return
 
         receiver = self.receivers_by_sender[sender]
@@ -181,7 +155,27 @@ class _Handler(LinkHandler):
                           delivery,
                           sender.target,
                           sender.connection)
+
+    def on_message(self, event):
+        if self.command.done.is_set():
+            return
+
+        self.received_responses += 1
+
+        self.command.output_thread.send(event.delivery)
+
+        self.command.info("Received response {} from {} on {}",
+                          event.message,
+                          event.link.source,
+                          event.connection)
+
+        if self.sent_requests == self.received_responses:
+            self.command.done.set()
+            self.command.output_thread.send(None)
+
     def close(self):
+        self.command.print("XXX Closing main")
+
         super(_Handler, self).close()
 
         self.command.notice("Sent {} {} and received {} {}",
