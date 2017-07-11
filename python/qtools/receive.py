@@ -53,6 +53,8 @@ class ReceiveCommand(MessagingCommand):
                           help="Write messages in JSON format")
         self.add_argument("--annotations", action="store_true",
                           help="Print delivery and message metadata")
+        self.add_argument("--router-trace", action="store_true",
+                          help="Print the routers the message passed through")
         self.add_argument("--no-prefix", action="store_true",
                           help="Suppress address prefix")
         self.add_argument("-c", "--count", metavar="COUNT", type=int,
@@ -65,6 +67,7 @@ class ReceiveCommand(MessagingCommand):
 
         self.json = self.args.json
         self.annotations = self.args.annotations
+        self.router_trace = self.args.router_trace
         self.no_prefix = self.args.no_prefix
         self.max_count = self.args.count
 
@@ -87,24 +90,24 @@ class _Handler(LinkHandler):
         self.received_messages += 1
 
         message = event.message
+        extra_info = False
 
         if self.command.annotations:
             if message.instructions is not None:
-                self.command.output_file.write("[delivery annotations]\n")
-
                 for name in sorted(message.instructions):
                     value = message.instructions[name]
-                    self.command.output_file.write("{}: {}\n".format(name, value))
+                    self.command.output_file.write("[delivery annotation] {}: {}\n".format(name, value))
 
             if message.annotations is not None:
-                self.command.output_file.write("[message annotations]\n")
-
                 for name in sorted(message.annotations):
                     value = message.annotations[name]
-                    self.command.output_file.write("{}: {}\n".format(name, value))
+                    self.command.output_file.write("[message annotation] {}: {}\n".format(name, value))
 
-            if message.instructions is not None or message.annotations is not None:
-                self.command.output_file.write("[message]\n")
+        if self.command.router_trace:
+            value = message.annotations.get("x-opt-qd.trace")
+
+            if value is not None:
+                self.command.output_file.write("[router trace] {}\n".format(", ".join(value)))
 
         if not self.command.no_prefix:
             prefix = event.link.source.address + ": "
