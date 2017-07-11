@@ -70,6 +70,14 @@ scheme is 'amqp' and 'server' is '127.0.0.1:5672'.  You can use the
 
     [SCHEME:][//SERVER/]ADDRESS
 
+The send and request commands take message content on standard input
+(one message per line) or via the `--message` option.  The `--message`
+option can be repeated.
+
+The receive and respond commands run forever unless you use the
+`--count` option to tell them to stop after processing a given number
+of messages or requests.
+
 With a few exceptions, all the tools share the following options.
 
     -h, --help            Print help output
