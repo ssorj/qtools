@@ -65,7 +65,8 @@ of a message source or target, such as a queue or topic.
     qsend ADDRESS-URL [ADDRESS-URL ...]
 
 An address URL has optional scheme and server parts.  The default
-scheme is 'amqp' and 'server' is '127.0.0.1:5672'.
+scheme is 'amqp' and 'server' is '127.0.0.1:5672'.  You can use the
+`--server` option to change the default server.
 
     [SCHEME:][//SERVER/]ADDRESS
 
@@ -82,23 +83,57 @@ Tools that read from or write to the console take these options.
 
 ### The `qsend` and `qreceive` commands
 
-    qsend [SCHEME:][//SERVER/]ADDRESS --message MESSAGE
+These commands perform one-way message transfers.
 
-    qreceive [SCHEME:][//SERVER/]ADDRESS --count 1
+    qsend URL --message MESSAGE
+
+    qreceive URL --count 1
     -> MESSAGE
+
+Typical usage:
+
+    $ qsend //amqp.zone/queue1 --message m1 &
+    $ qreceive //amqp.zone/queue1
+    queue1: m1
 
 ### The `qrequest` and `qrespond` commands
 
-    qrequest [SCHEME:][//SERVER/]ADDRESS --message REQUEST
+The request command sends a request and waits for a response.  The
+respond command listens for requests, processes them, and sends
+responses.
+
+    qrequest URL --message REQUEST
     -> RESPONSE
 
-    qrespond [SCHEME:][//SERVER/]ADDRESS --count 1
+    qrespond URL --count 1
+
+Typical usage:
+
+    $ qrespond //amqp.zone/jobs --upper &
+    $ qrequest //amqp.zone/jobs --message abc
+    ABC
 
 ### The `qmessage` command
 
-    qmessage --count 1 --id ID --body CONTENT
+This command generates message content for use by the `qsend` and
+`qrequest` tools.
+
+    qmessage --id ID --body CONTENT
     -> MESSAGE
 
+    qmessage --count 3
+    -> MESSAGE
+    -> MESSAGE
+    -> MESSAGE
+
+The output is in JSON format.  The send and request tools can consume
+it.  Usually you pipe it in, like this.
+
+    $ qmessage | qsend queue1
+    $ qmessage --rate 1 | qrequest //amqp.zone/jobs
+
 ### The `qbroker` command
+
+This is a simple broker implementation that you can use for testing.
 
     qbroker [--host HOST] [--port PORT]
