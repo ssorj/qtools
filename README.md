@@ -1,13 +1,13 @@
 # Qtools
 
     qsend [SCHEME:][//SERVER/]ADDRESS --message MESSAGE
-    
+
     qreceive [SCHEME:][//SERVER/]ADDRESS --count 1
     -> MESSAGE
-    
+
     qrequest [SCHEME:][//SERVER/]ADDRESS --message REQUEST
     -> RESPONSE
-    
+
     qrespond [SCHEME:][//SERVER/]ADDRESS --count 1
 
     qmessage --count 1 --id ID --body CONTENT
@@ -49,6 +49,16 @@ Tools that read from or write to the console take these options.
 ### Docker
 
     $ docker run -it ssorj/qtools
+
+### Docker (RHEL Atomic base image)
+
+    You can build the Docker image based on RHEL Atomic and run the environment with the following commands:
+
+    `docker build -t <myuser>/qtools-rhel docker/rhel-7`
+
+    *you must build the image in a correctly entitled host system*
+
+    `docker run -it <myuser>/qtools-rhel`
 
 ### Fedora 25
 
