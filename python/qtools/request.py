@@ -39,44 +39,32 @@ example usage:
   $ qrequest queue0 queue1 < messages.txt
 """
 
-class RequestCommand(Command):
+class RequestCommand(MessagingCommand):
     def __init__(self, home_dir):
-        super(RequestCommand, self).__init__(home_dir)
+        super(RequestCommand, self).__init__(home_dir, "qrequest", _Handler(self))
 
-        self.parser.description = _description
-        self.parser.epilog = url_epilog + _epilog
+        self.description = _description
+        self.epilog = url_epilog + _epilog
 
         self.add_link_arguments()
 
-        self.parser.add_argument("-m", "--message", metavar="CONTENT",
-                                 action="append", default=list(),
-                                 help="Send a request message containing CONTENT.  This option can be repeated.")
-        self.parser.add_argument("-i", "--input", metavar="FILE",
-                                 help="Read request messages from FILE, one per line (default stdin)")
-        self.parser.add_argument("-o", "--output", metavar="FILE",
-                                 help="Write response messages to FILE (default stdout)")
-        self.parser.add_argument("--json", action="store_true",
-                                 help="Write messages in JSON format")
-        self.parser.add_argument("--presettled", action="store_true",
-                                 help="Send messages with at-most-once reliability")
-
-        self.add_container_arguments()
-        self.add_common_arguments()
-
-        self.container.handler = _Handler(self)
-
-        self.messages = _collections.deque()
-        self.input_thread = InputThread(self)
+        self.add_argument("-m", "--message", metavar="CONTENT",
+                          action="append", default=list(),
+                          help="Send a request message containing CONTENT.  This option can be repeated.")
+        self.add_argument("--input", metavar="FILE",
+                          help="Read request messages from FILE, one per line (default stdin)")
+        self.add_argument("--output", metavar="FILE",
+                          help="Write response messages to FILE (default stdout)")
+        self.add_argument("--json", action="store_true",
+                          help="Write messages in JSON format")
+        self.add_argument("--presettled", action="store_true",
+                          help="Send messages fire-and-forget (at-most-once delivery)")
 
     def init(self):
         super(RequestCommand, self).init()
 
         self.init_link_attributes()
-        self.init_container_attributes()
-        self.init_common_attributes()
 
-        self.input_file = _sys.stdin
-        self.output_file = _sys.stdout
         self.json = self.args.json
         self.presettled = self.args.presettled
 
@@ -90,16 +78,11 @@ class RequestCommand(Command):
             message = _proton.Message(unicode(value))
             self.send_input(message)
 
-        if self.messages:
+        if self.input_messages:
             self.send_input(None)
-
-    def send_input(self, message):
-        self.messages.appendleft(message)
-        self.events.trigger(_reactor.ApplicationEvent("input"))
 
     def run(self):
         self.input_thread.start()
-
         super(RequestCommand, self).run()
 
 class _Handler(LinkHandler):
@@ -161,7 +144,7 @@ class _Handler(LinkHandler):
             return
 
         try:
-            message = self.command.messages.pop()
+            message = self.command.input_messages.pop()
         except IndexError:
             return
 
@@ -180,7 +163,7 @@ class _Handler(LinkHandler):
             self.senders.appendleft(sender)
 
         if not sender.credit:
-            self.command.messages.append(message)
+            self.command.input_messages.append(message)
             return
 
         receiver = self.receivers_by_sender[sender]
