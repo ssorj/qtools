@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/python
 #
 # Licensed to the Apache Software Foundation (ASF) under one
 # or more contributor license agreements.  See the NOTICE file
@@ -17,73 +17,134 @@
 # specific language governing permissions and limitations
 # under the License.
 #
-# -*- mode: sh; -*-
 
-set -e
+import os
+import sys
 
-if (( $# != 1 )); then
-    echo "Usage: qtools-test ADDRESS-URL"
-    exit 1
-fi
+home_dir = os.path.normpath("@qtools_home@")
+sys.path.insert(0, os.path.join(home_dir, "python"))
 
-url=$1
-work_dir=$(mktemp -d)
-sender_id=container-$RANDOM
-receiver_id=container-$RANDOM
-sent_message=message-$RANDOM
-request_message=request-$RANDOM
+from plano import *
 
-trap 'kill $(jobs -p)' SIGINT
+def start_message(args="", **kwargs):
+    return start_process("qmessage --verbose {}", args, **kwargs)
 
-qsend $OPTIONS $url --message $sent_message &
-received_message=$(qreceive $OPTIONS $url --count 1 --no-prefix)
+def start_send(url, args="", **kwargs):
+    return start_process("qsend --verbose {} {}", url, args, **kwargs)
 
-if [[ $received_message != $sent_message ]]; then
-    exit 1
-fi
+def start_receive(url, args="", **kwargs):
+    return start_process("qreceive --verbose {} {}", url, args, **kwargs)
 
-qmessage --count 10 | qsend --id $sender_id $OPTIONS $url &
-qreceive --id $receiver_id $OPTIONS $url --count 10 >/dev/null
+def start_request(url, args="", **kwargs):
+    return start_process("qrequest --verbose {} {}", url, args, **kwargs)
 
-qmessage --count 10 --rate 1000 | qsend $OPTIONS $url &
-qreceive $OPTIONS $url --count 10 >/dev/null
+def start_respond(url, args="", **kwargs):
+    return start_process("qrespond --verbose {} {}", url, args, **kwargs)
 
-qmessage --count 1 --prop x y | qsend --presettled $OPTIONS $url &
-qreceive $OPTIONS $url --count 1 --json >/dev/null
+def test_send_receive_args(out, url, message_args="", send_args="", receive_args="--count 1"):
+    message_proc = start_message(message_args, stdout=PIPE, stderr=out)
+    send_proc = start_send(url, stdin=message_proc.stdout, stderr=out)
+    receive_proc = start_receive(url, receive_args, stdout=PIPE, stderr=out)
 
-qrequest $OPTIONS $url --message $request_message > $work_dir/response_message &
-qrespond $OPTIONS $url --count 1
+    check_process(message_proc)
+    check_process(send_proc)
+    check_process(receive_proc)
 
-if [[ $(cat $work_dir/response_message) != $request_message ]]; then
-    exit 1
-fi
+    # XXX The receiver blocks indefinitely if qmessage or qsend fails
 
-qrequest $OPTIONS $url --message abc > $work_dir/response_message &
-qrespond $OPTIONS $url --count 1 --config - <<EOF
-def process(request, response):
-    response.body = request.body.upper()
-EOF
+    output = receive_proc.communicate()[0]
 
-if [[ $(cat $work_dir/response_message) != ABC ]]; then
-    exit 1
-fi
+    wait_for_process(message_proc)
+    wait_for_process(send_proc)
+    wait_for_process(receive_proc)
 
-qrequest $OPTIONS $url --message abc > $work_dir/response_message &
-qrespond $OPTIONS $url --count 1 --upper --reverse --append " and this"
+    return output[:-1]
 
-if [[ $(cat $work_dir/response_message) != "CBA and this" ]]; then
-    exit 1
-fi
+def test_request_respond_args(out, url, message_args="", request_args="", respond_args="--count 1"):
+    message_proc = start_message(message_args, stdout=PIPE, stderr=out)
+    request_proc = start_request(url, stdin=message_proc.stdout, stdout=PIPE, stderr=out)
+    respond_proc = start_respond(url, respond_args, stderr=out)
 
-qmessage --count 10 | qrequest --id $sender_id $OPTIONS $url >/dev/null &
-qrespond --id $receiver_id $OPTIONS $url --count 10
+    check_process(message_proc)
+    check_process(request_proc)
+    check_process(respond_proc)
 
-qmessage --count 10 --rate 1000 | qrequest $OPTIONS $url >/dev/null &
-qrespond $OPTIONS $url --count 10
+    # XXX The requester blocks indefinitely if qmessage or qsend fails
 
-qmessage --count 1 --prop x y | qrequest --presettled --json $OPTIONS $url >/dev/null &
-qrespond $OPTIONS $url --count 1
+    output = request_proc.communicate()[0]
 
-rm -rf $work_dir
+    wait_for_process(message_proc)
+    wait_for_process(request_proc)
+    wait_for_process(respond_proc)
 
-echo "qtools-test: PASSED"
+    return output[:-1]
+
+def test_send_receive(out, url):
+    body = test_send_receive_args(out, url, "--body abc123", "", "--count 1 --no-prefix")
+    assert body == "abc123", body
+
+    test_send_receive_args(out, url, "", "--presettled")
+    test_send_receive_args(out, url, "--count 10", "", "--count 10")
+    test_send_receive_args(out, url, "--count 10 --rate 1000", "", "--count 10")
+
+def test_request_respond(out, url):
+    body = test_request_respond_args(out, url, "--body abc123", "", "--count 1 --reverse --upper --append ' and this'")
+    assert body == "321CBA and this", body
+
+    test_request_respond_args(out, url, "", "--presettled")
+    test_request_respond_args(out, url, "--count 10", "", "--count 10")
+    test_request_respond_args(out, url, "--count 10 --rate 1000", "", "--count 10")
+
+def test_message(out, url):
+    test_send_receive_args(out, url, "--id m1 --correlation-id c1")
+    test_send_receive_args(out, url, "--user ssorj")
+    test_send_receive_args(out, url, "--to xyz --reply-to abc")
+    test_send_receive_args(out, url, "--durable")
+    test_send_receive_args(out, url, "--priority 100")
+    test_send_receive_args(out, url, "--ttl 100.1")
+    test_send_receive_args(out, url, "--body hello")
+    test_send_receive_args(out, url, "--property x y --property a b")
+
+def run_test(url, name, failures):
+    sys.stdout.write("{:.<73} ".format(name + " "))
+
+    namespace = globals()
+    function = namespace["test_{}".format(name)]
+
+    output_file = make_temp_file()
+
+    try:
+        with open(output_file, "w") as out:
+            #function(out, url)
+            # XXX
+            function(sys.stdout, url)
+    except CalledProcessError:
+        eprint(read(output_file), end="")
+
+        failures += 1
+
+        print("FAILED")
+
+    print("PASSED")
+
+def main():
+    set_message_threshold("warn")
+
+    url = sys.argv[1]
+
+    failures = 0
+
+    run_test(url, "send_receive", failures)
+    run_test(url, "request_respond", failures)
+    run_test(url, "message", failures)
+
+    if failures == 0:
+        print("All tests passed")
+    else:
+        fail("Some tests failed")
+
+if __name__ == "__main__":
+    try:
+        main()
+    except KeyboardInterrupt:
+        pass

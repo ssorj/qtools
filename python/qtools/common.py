@@ -26,6 +26,7 @@ from __future__ import with_statement
 import argparse as _argparse
 import binascii as _binascii
 import collections as _collections
+import commandante as _commandante
 import json as _json
 import proton as _proton
 import proton.handlers as _handlers
@@ -46,136 +47,102 @@ address URLs:
   //localhost/queue0
   amqp://example.net:10000/jobs
   amqps://10.0.0.10/jobs/alpha
-
-  By default, SCHEME is 'amqp' and SERVER is '127.0.0.1:5672'.
 """
 
-class CommandError(Exception):
-    def __init__(self, message, *args):
-        if isinstance(message, Exception):
-            message = str(message)
+class MessagingCommand(_commandante.Command):
+    def __init__(self, home_dir, name, handler):
+        super(MessagingCommand, self).__init__(home_dir, name)
 
-        message = message.format(*args)
+        self.container = _reactor.Container(handler)
 
-        super(CommandError, self).__init__(message)
-
-class Command(object):
-    def __init__(self, home_dir):
-        self.home_dir = home_dir
-
-        self.parser = _argparse.ArgumentParser()
-        self.parser.formatter_class = _Formatter
-
-        self.args = None
-
-        self.container = _reactor.Container()
         self.events = _reactor.EventInjector()
-
         self.container.selectable(self.events)
 
-        self.quiet = False
-        self.verbose = False
-        self.init_only = False
+        self.input_file = _sys.stdin
+        self.input_thread = _InputThread(self)
+        self.input_messages = _collections.deque()
 
-        for arg in _sys.argv:
-            if "=" not in arg:
-                self.name = arg.rsplit("/", 1)[-1]
-                break
+        self.output_file = _sys.stdout
 
         self.ready = _threading.Event()
         self.done = _threading.Event()
 
+        self.add_argument("--id", metavar="ID",
+                          help="Set the container identity to ID")
+
     def add_link_arguments(self):
-        self.parser.add_argument("url", metavar="ADDRESS-URL", nargs="+",
-                                 help="The location of a message source or target")
-
-    def add_container_arguments(self):
-        self.parser.add_argument("--id", metavar="ID",
-                                 help="Set the container identity to ID")
-
-    def add_common_arguments(self):
-        self.parser.add_argument("--quiet", action="store_true",
-                                 help="Print no logging to the console")
-        self.parser.add_argument("--verbose", action="store_true",
-                                 help="Print detailed logging to the console")
-        self.parser.add_argument("--init-only", action="store_true",
-                                 help=_argparse.SUPPRESS)
+        self.add_argument("url", metavar="ADDRESS-URL", nargs="+",
+                          help="The location of a message source or target")
+        self.add_argument("--server", metavar="HOST[:PORT]", default="127.0.0.1:5672",
+                          help="Use HOST[:PORT] as the default server (default 127.0.0.1:5672)")
+        self.add_argument("--tls", action="store_true",
+                          help="Connect using SSL/TLS authentication and encryption")
 
     def init(self):
-        assert self.parser is not None
-        assert self.args is None
+        super(MessagingCommand, self).init()
 
-        self.args = self.parser.parse_args()
-
-    def init_link_attributes(self):
-        self.urls = self.args.url
-
-    def init_container_attributes(self):
         self.id = self.args.id
-
-    def init_common_attributes(self):
-        self.quiet = self.args.quiet
-        self.verbose = self.args.verbose
-        self.init_only = self.args.init_only
 
         if self.id is None:
             self.id = "{}-{}".format(self.name, unique_id())
 
         self.container.container_id = self.id
 
+    def init_link_attributes(self):
+        self.server = self.args.server
+        self.tls_enabled = self.args.tls
+        self.urls = self.args.url
+
+    def parse_address_url(self, address):
+        url = _urlparse(address)
+
+        if url.path is None:
+            self.fail("The URL has no path")
+
+        scheme = url.scheme
+        host = url.hostname
+        port = url.port
+        path = url.path
+
+        default_scheme = "amqps" if self.tls_enabled else "amqp"
+
+        try:
+            default_host, default_port = self.server.split(":", 1)
+        except ValueError:
+            default_host, default_port = self.server, 5672
+
+        if not scheme:
+            scheme = default_scheme
+
+        if host is None:
+            host = default_host
+
+        if port is None:
+            port = default_port
+
+        port = str(port)
+
+        if path.startswith("/"):
+            path = path[1:]
+
+        return scheme, host, port, path
+
     def send_input(self, message):
-        raise NotImplementedError()
+        self.input_messages.appendleft(message)
+        self.events.trigger(_reactor.ApplicationEvent("input"))
 
     def run(self):
         self.container.run()
 
-    def main(self):
-        try:
-            self.init()
+    def print(self, message, *args):
+        summarized_args = [_summarize(x) for x in args]
+        super(MessagingCommand, self).print(message, *summarized_args)
 
-            if self.init_only:
-                return
-
-            self.run()
-        except CommandError as e:
-            self.error(str(e))
-            _sys.exit(1)
-        except KeyboardInterrupt:
-            pass
-
-    def info(self, message, *args):
-        if self.verbose:
-            self._print_message(message, args)
-
-    def notice(self, message, *args):
-        if not self.quiet:
-            self._print_message(message, args)
-
-    def warn(self, message, *args):
-        message = "Warning! {}".format(message)
-
-        self._print_message(message, args)
-
-    def error(self, message, *args):
-        message = "Error! {}".format(message)
-
-        self._print_message(message, args)
-
-        _sys.exit(1)
-
-    def _print_message(self, message, args):
-        summarized_args = [summarize(x) for x in args]
-
-        message = message[0].upper() + message[1:]
-        message = message.format(*summarized_args)
-        message = "{}: {}".format(self.id, message)
-
-        _sys.stderr.write("{}\n".format(message))
-        _sys.stderr.flush()
-
-class InputThread(_threading.Thread):
+class _InputThread(_threading.Thread):
     def __init__(self, command):
         _threading.Thread.__init__(self)
+
+        assert isinstance(command, MessagingCommand)
 
         self.command = command
         self.daemon = True
@@ -219,8 +186,10 @@ class LinkHandler(_handlers.MessagingHandler):
 
     def on_start(self, event):
         for url in self.command.urls:
-            scheme, host, port, address = parse_address_url(url)
+            scheme, host, port, address = self.command.parse_address_url(url)
             connection_url = "{}://{}:{}".format(scheme, host, port)
+
+            self.command.info("Connecting to {}", connection_url)
 
             connection = event.container.connect(connection_url, allowed_mechs=b"ANONYMOUS")
             links = self.open_links(event, connection, address)
@@ -258,9 +227,9 @@ class LinkHandler(_handlers.MessagingHandler):
         delivery = event.delivery
 
         template = "{} {{}} {} to {}"
-        template = template.format(summarize(event.connection),
-                                   summarize(delivery),
-                                   summarize(event.link.target))
+        template = template.format(_summarize(event.connection),
+                                   _summarize(delivery),
+                                   _summarize(event.link.target))
 
         if delivery.remote_state == delivery.ACCEPTED:
             self.command.info(template, "accepted")
@@ -279,7 +248,7 @@ class LinkHandler(_handlers.MessagingHandler):
 
         self.command.events.close()
 
-def summarize(entity):
+def _summarize(entity):
     if isinstance(entity, _proton.Connection):
         return _summarize_connection(entity)
 
@@ -345,34 +314,6 @@ def plural(word, count, override=None):
 
     return word + "s"
 
-def parse_address_url(address):
-    url = _urlparse(address)
-
-    if url.path is None:
-        raise CommandError("The URL has no path")
-
-    scheme = url.scheme
-    host = url.hostname
-    port = url.port
-    path = url.path
-
-    if scheme is None:
-        scheme = "amqp"
-
-    if host is None:
-        # XXX Should be "localhost" - a workaround for a proton issue
-        host = "127.0.0.1"
-
-    if port is None:
-        port = 5672
-
-    port = str(port)
-
-    if path.startswith("/"):
-        path = path[1:]
-
-    return scheme, host, port, path
-
 def convert_data_to_message(data):
     message = _proton.Message()
 
@@ -382,6 +323,8 @@ def convert_data_to_message(data):
     _set_message_attribute(message, "address", data, "to")
     _set_message_attribute(message, "reply_to", data, "reply_to")
     _set_message_attribute(message, "durable", data, "durable")
+    _set_message_attribute(message, "priority", data, "priority")
+    _set_message_attribute(message, "ttl", data, "ttl")
     _set_message_attribute(message, "subject", data, "subject")
     _set_message_attribute(message, "body", data, "body")
 
@@ -414,7 +357,13 @@ def convert_message_to_data(message):
     if message.durable:
         _set_data_attribute(data, "durable", message, "durable")
 
-    if message.properties is not None:
+    if message.priority != 4:
+        _set_data_attribute(data, "priority", message, "priority")
+
+    if message.ttl != 0:
+        _set_data_attribute(data, "ttl", message, "ttl")
+
+    if message.properties:
         props = data["properties"] = _collections.OrderedDict()
 
         for name in message.properties:
@@ -432,6 +381,3 @@ def _set_data_attribute(data, dname, message, mname, omit_if_empty=True):
         return
 
     data[dname] = getattr(message, mname)
-
-class _Formatter(_argparse.RawDescriptionHelpFormatter):
-    pass

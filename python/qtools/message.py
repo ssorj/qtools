@@ -24,6 +24,7 @@ from __future__ import unicode_literals
 from __future__ import with_statement
 
 import collections as _collections
+import commandante as _commandante
 import json as _json
 import proton as _proton
 import sys as _sys
@@ -33,45 +34,48 @@ from .common import *
 
 _description = "Generate AMQP messages"
 
-class MessageCommand(Command):
+class MessageCommand(_commandante.Command):
     def __init__(self, home_dir):
-        super(MessageCommand, self).__init__(home_dir)
+        super(MessageCommand, self).__init__(home_dir, "qmessage")
 
-        self.parser.description = _description
+        self.description = _description
 
-        self.parser.add_argument("-o", "--output", metavar="FILE",
-                                 help="Write messages to FILE (default stdout)")
-        self.parser.add_argument("-c", "--count", metavar="COUNT", type=int,
-                                 help="Exit after generating COUNT messages (default 1)")
-        self.parser.add_argument("--rate", metavar="COUNT", type=int,
-                                 help="Generate COUNT messages per second")
+        self.add_argument("--output", metavar="FILE",
+                          help="Write messages to FILE (default stdout)")
+        self.add_argument("-c", "--count", metavar="COUNT", type=int,
+                          help="Exit after generating COUNT messages (default 1)")
+        self.add_argument("--rate", metavar="COUNT", type=int,
+                          help="Generate COUNT messages per second")
 
-        self.parser.add_argument("--id", metavar="STRING",
-                                 help="Set the message ID")
-        self.parser.add_argument("--correlation-id", metavar="STRING",
-                                 help="Set the ID for matching related messages")
-        self.parser.add_argument("--user", metavar="STRING",
-                                 help="Set the ID of the user producing the message")
-        self.parser.add_argument("--to", metavar="ADDRESS",
-                                 help="Set the target address")
-        self.parser.add_argument("--reply-to", metavar="ADDRESS",
-                                 help="Set the address for replies")
-        self.parser.add_argument("--durable", action="store_true",
-                                 help="Set the durable flag")
-        self.parser.add_argument("--subject", metavar="STRING",
-                                 help="Set the message summary")
-        self.parser.add_argument("--body", metavar="STRING",
-                                 help="Set the main message content")
-        self.parser.add_argument("--prop", metavar=("NAME", "VALUE"),
-                                 nargs=2, action="append",
-                                 help="Set an application property")
+        self.add_argument("--id", metavar="STRING",
+                          help="Set the message ID")
+        self.add_argument("--correlation-id", metavar="STRING",
+                          help="Set the ID for matching related messages")
+        self.add_argument("--user", metavar="STRING",
+                          help="Set the ID of the user producing the message")
+        self.add_argument("--to", metavar="ADDRESS",
+                          help="Set the target address")
+        self.add_argument("--reply-to", metavar="ADDRESS",
+                          help="Set the address for replies")
+        self.add_argument("--durable", action="store_true",
+                          help="Set the durable flag")
+        self.add_argument("--priority", metavar="INTEGER",
+                          help="Set the priority to INTEGER")
+        self.add_argument("--ttl", metavar="FLOAT",
+                          help="Set the time-to-live to FLOAT seconds")
+        self.add_argument("--subject", metavar="STRING",
+                          help="Set the message summary")
+        self.add_argument("--body", metavar="STRING",
+                          help="Set the main message content")
+        self.add_argument("--property", metavar=("NAME", "VALUE"),
+                          nargs=2, action="append",
+                          help="Set an application property. This option can be repeated.")
 
-        self.add_common_arguments()
+        self.output_file = _sys.stdout
 
     def init(self):
         super(MessageCommand, self).init()
 
-        self.output_file = _sys.stdout
         self.max_count = self.args.count
         self.rate = self.args.rate
 
@@ -102,10 +106,26 @@ class MessageCommand(Command):
         self.message.body = self.args.body
         self.message.durable = self.args.durable
 
+        if self.args.priority is not None:
+            try:
+                priority = int(self.args.priority)
+            except ValueError:
+                self.fail("Priority value must be an integer")
+
+            self.message.priority = priority
+
+        if self.args.ttl is not None:
+            try:
+                ttl = float(self.args.ttl)
+            except ValueError:
+                self.fail("TTL value must be a float")
+
+            self.message.ttl = ttl
+
         self.message.properties = _collections.OrderedDict()
 
-        if self.args.prop is not None:
-            for name, value in self.args.prop:
+        if self.args.property is not None:
+            for name, value in self.args.property:
                 self.message.properties[name] = value
 
         self.generate_message_id = False

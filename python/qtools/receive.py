@@ -24,6 +24,7 @@ from __future__ import unicode_literals
 from __future__ import with_statement
 
 import json as _json
+import os as _os
 import proton as _proton
 import proton.reactor as _reactor
 import sys as _sys
@@ -38,39 +39,40 @@ example usage:
   $ qreceive queue0 queue1 > messages.txt
 """
 
-class ReceiveCommand(Command):
+class ReceiveCommand(MessagingCommand):
     def __init__(self, home_dir):
-        super(ReceiveCommand, self).__init__(home_dir)
+        super(ReceiveCommand, self).__init__(home_dir, "qreceive", _Handler(self))
 
-        self.parser.description = _description
-        self.parser.epilog = url_epilog + _epilog
+        self.description = _description
+        self.epilog = url_epilog + _epilog
 
         self.add_link_arguments()
 
-        self.parser.add_argument("-o", "--output", metavar="FILE",
-                                 help="Write messages to FILE (default stdout)")
-        self.parser.add_argument("--json", action="store_true",
-                                 help="Write messages in JSON format")
-        self.parser.add_argument("--no-prefix", action="store_true",
-                                 help="Suppress address prefix")
-        self.parser.add_argument("-c", "--count", metavar="COUNT", type=int,
-                                 help="Exit after receiving COUNT messages")
-
-        self.add_container_arguments()
-        self.add_common_arguments()
-
-        self.container.handler = _Handler(self)
+        self.add_argument("--output", metavar="FILE",
+                          help="Write messages to FILE (default stdout)")
+        self.add_argument("--json", action="store_true",
+                          help="Write messages in JSON format")
+        self.add_argument("--annotations", action="store_true",
+                          help="Print delivery and message annotations")
+        self.add_argument("--properties", action="store_true",
+                          help="Print message application properties")
+        self.add_argument("--router-trace", action="store_true",
+                          help="Print the list of routers the message passed through")
+        self.add_argument("--no-prefix", action="store_true",
+                          help="Suppress address prefix")
+        self.add_argument("-c", "--count", metavar="COUNT", type=int,
+                          help="Exit after receiving COUNT messages")
 
     def init(self):
         super(ReceiveCommand, self).init()
 
         self.init_link_attributes()
-        self.init_container_attributes()
-        self.init_common_attributes()
 
-        self.output_file = _sys.stdout
-        self.json = self.args.json
-        self.no_prefix = self.args.no_prefix
+        self.json_enabled = self.args.json
+        self.annotations_enabled = self.args.annotations
+        self.properties_enabled = self.args.properties
+        self.router_trace_enabled = self.args.router_trace
+        self.prefix_disabled = self.args.no_prefix
         self.max_count = self.args.count
 
         if self.args.output is not None:
@@ -91,20 +93,47 @@ class _Handler(LinkHandler):
 
         self.received_messages += 1
 
-        if not self.command.no_prefix:
-            prefix = event.link.source.address + ": "
-            self.command.output_file.write(prefix)
+        message = event.message
+        extra_info = False
 
-        if self.command.json:
-            data = convert_message_to_data(event.message)
+        if self.command.annotations_enabled:
+            if message.instructions is not None:
+                for name in sorted(message.instructions):
+                    value = message.instructions[name]
+                    self.writeln("[delivery annotation] {}: {}", name, value)
+
+            if message.annotations is not None:
+                for name in sorted(message.annotations):
+                    value = message.annotations[name]
+                    self.writeln("[message annotation] {}: {}", name, value)
+
+        if self.command.properties_enabled:
+            if message.properties is not None:
+                for name in sorted(message.properties):
+                    value = message.properties[name]
+                    self.writeln("[property] {}: {}", name, value)
+
+        if self.command.router_trace_enabled:
+            value = message.annotations.get("x-opt-qd.trace")
+            value = ", ".join(value)
+
+            if value is not None:
+                self.writeln("[router trace] {}", value)
+
+        if not self.command.prefix_disabled:
+            prefix = event.link.source.address + ": "
+            self.write(prefix)
+
+        if self.command.json_enabled:
+            data = convert_message_to_data(message)
             _json.dump(data, self.command.output_file)
         else:
-            self.command.output_file.write(event.message.body)
+            self.write(message.body)
 
-        self.command.output_file.write("\n")
+        self.writeln()
 
         self.command.info("Received {} from {} on {}",
-                          event.message,
+                          message,
                           event.link.source,
                           event.connection)
 
@@ -118,3 +147,14 @@ class _Handler(LinkHandler):
         self.command.notice("Received {} {}",
                             self.received_messages,
                             plural("message", self.received_messages))
+
+    def write(self, template=None, *args):
+        if template is None:
+            return
+
+        string = template.format(*args)
+        self.command.output_file.write(string)
+
+    def writeln(self, template=None, *args):
+        self.write(template, *args)
+        self.write(_os.linesep)
