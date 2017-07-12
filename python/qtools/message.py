@@ -63,9 +63,9 @@ class MessageCommand(_commandante.Command):
                           help="Set the message summary")
         self.add_argument("--body", metavar="STRING",
                           help="Set the main message content")
-        self.add_argument("--prop", metavar=("NAME", "VALUE"),
+        self.add_argument("--property", metavar=("NAME", "VALUE"),
                           nargs=2, action="append",
-                          help="Set an application property")
+                          help="Set an application property. This option can be repeated.")
 
         self.output_file = _sys.stdout
 
@@ -104,8 +104,8 @@ class MessageCommand(_commandante.Command):
 
         self.message.properties = _collections.OrderedDict()
 
-        if self.args.prop is not None:
-            for name, value in self.args.prop:
+        if self.args.property is not None:
+            for name, value in self.args.property:
                 self.message.properties[name] = value
 
         self.generate_message_id = False

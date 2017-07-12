@@ -109,9 +109,9 @@ def run_test(url, name, failures):
 
     try:
         with open(output_file, "w") as out:
-            function(out, url)
+            #function(out, url)
             # XXX
-            #function(sys.stdout, url)
+            function(sys.stdout, url)
     except CalledProcessError:
         eprint(read(output_file), end="")
 
