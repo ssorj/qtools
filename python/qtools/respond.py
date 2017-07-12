@@ -83,12 +83,12 @@ class RespondCommand(MessagingCommand):
             try:
                 config = _runpy.run_path(config_file)
             except:
-                self.error("Failed to load config from '{}'", config_file)
+                self.fail("Failed to load config from '{}'", config_file)
 
             try:
                 self.process = config["process"]
             except KeyError:
-                self.error("Function 'process' not found in '{}'", config_file)
+                self.fail("Function 'process' not found in '{}'", config_file)
 
         self.max_count = self.args.count
         self.upper = self.args.upper

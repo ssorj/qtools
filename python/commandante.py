@@ -109,14 +109,14 @@ class Command(object):
 
     def warn(self, message, *args):
         message = "Warning! {}".format(message)
-
         self.print(message, *args)
 
     def error(self, message, *args):
         message = "Error! {}".format(message)
-
         self.print(message, *args)
 
+    def fail(self, message, *args):
+        self.error(message, *args)
         _sys.exit(1)
 
     def print(self, message, *args):

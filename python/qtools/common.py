@@ -323,6 +323,8 @@ def convert_data_to_message(data):
     _set_message_attribute(message, "address", data, "to")
     _set_message_attribute(message, "reply_to", data, "reply_to")
     _set_message_attribute(message, "durable", data, "durable")
+    _set_message_attribute(message, "priority", data, "priority")
+    _set_message_attribute(message, "ttl", data, "ttl")
     _set_message_attribute(message, "subject", data, "subject")
     _set_message_attribute(message, "body", data, "body")
 
@@ -354,6 +356,12 @@ def convert_message_to_data(message):
 
     if message.durable:
         _set_data_attribute(data, "durable", message, "durable")
+
+    if message.priority != 4:
+        _set_data_attribute(data, "priority", message, "priority")
+
+    if message.ttl != 0:
+        _set_data_attribute(data, "ttl", message, "ttl")
 
     if message.properties:
         props = data["properties"] = _collections.OrderedDict()

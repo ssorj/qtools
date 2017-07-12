@@ -59,6 +59,10 @@ class MessageCommand(_commandante.Command):
                           help="Set the address for replies")
         self.add_argument("--durable", action="store_true",
                           help="Set the durable flag")
+        self.add_argument("--priority", metavar="INTEGER",
+                          help="Set the priority to INTEGER")
+        self.add_argument("--ttl", metavar="FLOAT",
+                          help="Set the time-to-live to FLOAT seconds")
         self.add_argument("--subject", metavar="STRING",
                           help="Set the message summary")
         self.add_argument("--body", metavar="STRING",
@@ -101,6 +105,22 @@ class MessageCommand(_commandante.Command):
         self.message.subject = self.args.subject
         self.message.body = self.args.body
         self.message.durable = self.args.durable
+
+        if self.args.priority is not None:
+            try:
+                priority = int(self.args.priority)
+            except ValueError:
+                self.fail("Priority value must be an integer")
+
+            self.message.priority = priority
+
+        if self.args.ttl is not None:
+            try:
+                ttl = float(self.args.ttl)
+            except ValueError:
+                self.fail("TTL value must be a float")
+
+            self.message.ttl = ttl
 
         self.message.properties = _collections.OrderedDict()
 
