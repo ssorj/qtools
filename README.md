@@ -28,6 +28,16 @@
 
     $ docker run -it ssorj/qtools
 
+### Docker (RHEL Atomic base image)
+
+    You can build the Docker image based on RHEL Atomic and run the environment with the following commands:
+
+    `docker build -t <myuser>/qtools-rhel docker/rhel-7`
+
+    *you must build the image in a correctly entitled host system*
+
+    `docker run -it <myuser>/qtools-rhel`
+
 ### Using Fedora packages
 
     $ sudo dnf install dnf-plugins-core
