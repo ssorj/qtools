@@ -494,34 +494,21 @@ class working_dir(object):
 
 def call(command, *args, **kwargs):
     proc = start_process(command, *args, **kwargs)
-
-    wait_for_process(proc)
-
-    if proc.returncode != 0:
-        command_string = _command_string(command)
-        command_string = command_string.format(*args)
-
-        raise CalledProcessError(proc.returncode, command_string)
+    check_process(proc)
 
 def call_for_exit_code(command, *args, **kwargs):
     proc = start_process(command, *args, **kwargs)
-
-    wait_for_process(proc)
-
-    return proc.returncode
+    return wait_for_process(proc)
 
 def call_for_output(command, *args, **kwargs):
     kwargs["stdout"] = _subprocess.PIPE
 
     proc = start_process(command, *args, **kwargs)
     output = proc.communicate()[0]
-    exit_code = proc.poll()
+    exit_code = proc.poll() # XXX I don't know if None is possible here
 
     if exit_code not in (None, 0):
-        command_string = _command_string(command)
-        command_string = command_string.format(*args)
-
-        error = CalledProcessError(exit_code, command_string)
+        error = CalledProcessError(exit_code, proc.command_string)
         error.output = output
 
         raise error
@@ -545,28 +532,29 @@ class _Process(_subprocess.Popen):
     def __init__(self, command, *args, **kwargs):
         super(_Process, self).__init__(command, *args, **kwargs)
 
-        try:
+        if _is_string(command):
+            self.name = program_name(command)
+            self.command_string = command
+        elif isinstance(command, _collections.Iterable):
+            self.name = command[0]
+            self.command_string = _command_string(command, args)
+        else:
+            raise Exception()
+
+        if "name" in kwargs:
             self.name = kwargs["name"]
-        except KeyError:
-            if _is_string(command):
-                self.name = program_name(command)
-            elif isinstance(command, _collections.Iterable):
-                self.name = command[0]
-            else:
-                raise Exception()
 
         _child_processes.append(self)
 
     def __repr__(self):
         return "process {0} ({1})".format(self.pid, self.name)
 
-def _command_string(command):
-    if _is_string(command):
-        return command
-
+def _command_string(command, args):
     elems = ["\"{0}\"".format(x) if " " in x else x for x in command]
+    string = " ".join(elems)
+    string = string.format(*args)
 
-    return " ".join(elems)
+    return string
 
 def default_sigterm_handler(signum, frame):
     for proc in _child_processes:
@@ -608,6 +596,14 @@ def start_process(command, *args, **kwargs):
 
     return proc
 
+def terminate_process(proc):
+    notice("Terminating {0}", proc)
+
+    if proc.poll() is None:
+        proc.terminate()
+    else:
+        debug("{0} already exited", proc)
+
 def stop_process(proc):
     notice("Stopping {0}", proc)
 
@@ -640,13 +636,10 @@ def wait_for_process(proc):
     return proc.returncode
 
 def check_process(proc):
-    exit_code = proc.poll()
+    wait_for_process(proc)
 
-    if exit_code is None:
-        return
-
-    if exit_code != 0:
-        fail("{0} exited with code {1}", proc, proc.returncode)
+    if proc.returncode != 0:
+        raise CalledProcessError(proc.returncode, proc.command_string)
 
 def make_archive(input_dir, output_dir, archive_stem):
     temp_dir = make_temp_dir()

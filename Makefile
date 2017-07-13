@@ -58,7 +58,7 @@ devel: install
 
 .PHONY:
 test: devel
-	scripts/run-tests
+	qtools-test
 
 .PHONY: big-test
 big-test: test
