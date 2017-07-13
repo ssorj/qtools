@@ -505,7 +505,10 @@ def call_for_output(command, *args, **kwargs):
 
     proc = start_process(command, *args, **kwargs)
     output = proc.communicate()[0]
-    exit_code = proc.poll() # XXX I don't know if None is possible here
+    exit_code = proc.poll()
+
+    # XXX I don't know if None is possible here
+    assert exit_code is not None
 
     if exit_code not in (None, 0):
         error = CalledProcessError(exit_code, proc.command_string)
