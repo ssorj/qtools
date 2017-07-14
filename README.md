@@ -1,5 +1,7 @@
 # Qtools
 
+[![Build Status](https://travis-ci.org/ssorj/qtools.svg?branch=master)](https://travis-ci.org/ssorj/qtools)
+
     $ qreceive amqp://amqp.zone/queue1 --count 1 &
     $ qsend amqp://amqp.zone/queue1 --message hello
 
