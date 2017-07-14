@@ -27,5 +27,6 @@ build/SOURCES/${NAME}-SNAPSHOT.tar.gz: build/commit
 
 build/SRPMS/${NAME}-SNAPSHOT.src.rpm: build/SPECS/${NAME}.spec ${SOURCES}
 	rpmbuild -D "_topdir ${PWD}/build" -bs $<
+	@rm -f $@
 	cp build/SRPMS/${NAME}-*.src.rpm $@
 	@echo "Output: ${PWD}/$@"
