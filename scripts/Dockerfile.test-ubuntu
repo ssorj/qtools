@@ -9,5 +9,6 @@ RUN apt-get update \
     && apt-get -y install make python-qpid-proton
 
 ADD . /root/qtools
+WORKDIR /root/qtools
 
-CMD ["/bin/bash", "-c", "cd /root/qtools && make install PREFIX=/usr && qtools-test"]
+CMD ["/bin/bash", "-c", "make install PREFIX=/usr && qtools-test"]
