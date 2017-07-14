@@ -1,6 +1,6 @@
 .PHONY: build
 build:
-	sudo docker build -t ssorj/qtools .
+	sudo docker build -t --no-cache ssorj/qtools .
 
 .PHONY: test
 test: build
