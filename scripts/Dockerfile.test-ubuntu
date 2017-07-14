@@ -1,0 +1,13 @@
+FROM ubuntu
+MAINTAINER Justin Ross <jross@apache.org>
+
+RUN apt-get update \
+    && apt-get -y install software-properties-common \
+    && add-apt-repository ppa:qpid/released
+
+RUN apt-get update \
+    && apt-get -y install make python-qpid-proton
+
+ADD . /root/qtools
+
+CMD ["/bin/bash", "-c", "cd /root/qtools && make install PREFIX=/usr && qtools-test"]

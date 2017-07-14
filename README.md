@@ -1,23 +1,18 @@
 # Qtools
 
-    qsend URL [URLS] [OPTIONS] [< messages.txt]
-    qreceive URL [URLS] [OPTIONS] [> messages.txt]
-
     $ qreceive amqp://amqp.zone/queue1 --count 1 &
     $ qsend amqp://amqp.zone/queue1 --message hello
 
-    qrequest URL [URLS] [OPTIONS] [< requests.txt] [> responses.txt]
-    qrespond URL [URLS] [OPTIONS]
-
     $ qrespond amqp://amqp.zone/requests &
     $ qrequest amqp://amqp.zone/requests < requests.txt
-
-    qmessage [OPTIONS] | {qsend,qrequest}
 
     $ qmessage --count 10 | qsend amqp://amqp.zone/queue1
     $ qmessage --rate 1 | qrequest amqp://amqp.zone/requests
 
 ## Installation
+
+For more ways to build and use Docker images and packages, see
+[the packaging README](packaging).
 
 ### Dependencies
 
@@ -26,17 +21,7 @@
 
 ### Using Docker images
 
-    $ docker run -it ssorj/qtools
-
-### Docker (RHEL Atomic base image)
-
-You can build the Docker image based on RHEL Atomic and run the environment with the following commands:
-
-    `docker build -t <myuser>/qtools-rhel docker/rhel-7`
-
-*Note: you must build the image in a correctly entitled host system*
-
-    `docker run -it <myuser>/qtools-rhel`
+    $ sudo docker run -it ssorj/qtools
 
 ### Using Fedora packages
 
@@ -57,7 +42,8 @@ PPA.
 
     $ sudo apt-get install software-properties-common
     $ sudo add-apt-repository ppa:qpid/released
-    $ sudo apt-get upgrade python-qpid-proton
+    $ sudo apt-get update
+    $ sudo apt-get install make python-qpid-proton
 
 After this you can install from source.
 
@@ -88,20 +74,24 @@ The receive and respond commands run forever unless you use the
 `--count` option to tell them to stop after processing a given number
 of messages or requests.
 
-With a few exceptions, all the tools share the following options.
+Tools that read from or write to the console take the following
+options.
+
+    --input FILE          Read input from FILE
+    --output FILE         Write output to FILE
+
+With a few exceptions, all the tools share these options.
 
     -h, --help            Print help output
     --verbose             Print detailed logging
     --quiet               Print no logging
 
-Tools that read from or write to the console take these options.
-
-    --input FILE          Read input from FILE
-    --output FILE         Write output to FILE
-
 ### The `qsend` and `qreceive` commands
 
 These commands perform one-way message transfers.
+
+    qsend URL [URLS] [OPTIONS] [< messages.txt]
+    qreceive URL [URLS] [OPTIONS] [> messages.txt]
 
     qsend URL --message MESSAGE
 
@@ -125,6 +115,9 @@ The request command sends a request and waits for a response.  The
 respond command listens for requests, processes them, and sends
 responses.
 
+    qrequest URL [URLS] [OPTIONS] [< requests.txt] [> responses.txt]
+    qrespond URL [URLS] [OPTIONS]
+
     qrequest URL --message REQUEST
     -> RESPONSE
 
@@ -143,6 +136,8 @@ Typical usage:
 
 This command generates message content for use by the `qsend` and
 `qrequest` tools.
+
+    qmessage [OPTIONS] | {qsend,qrequest}
 
     qmessage --id ID --body CONTENT
     -> MESSAGE

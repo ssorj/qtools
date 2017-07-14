@@ -1,0 +1,10 @@
+FROM fedora
+MAINTAINER Justin Ross <jross@apache.org>
+
+RUN yum -y update && yum clean all
+
+RUN yum -y install make python-qpid-proton && yum clean all
+
+ADD . /root/qtools
+
+CMD ["/bin/bash", "-c", "cd /root/qtools && make install PREFIX=/usr && qtools-test"]

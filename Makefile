@@ -61,6 +61,20 @@ test: devel
 	qtools-test
 
 .PHONY: big-test
-big-test: test
+big-test: test test-centos test-fedora test-ubuntu
 	qtools-test //amqp.zone/queue-$(shell echo $$RANDOM)
-#	qtools-test amqps://messaging-enmasse.34.210.100.115.nip.io:443/myqueue
+
+.PHONY: test-centos
+test-centos:
+	sudo docker build -f scripts/Dockerfile.test-centos -t ${USER}/qtools-test-centos .
+	sudo docker run ${USER}/qtools-test-centos
+
+.PHONY: test-fedora
+test-fedora:
+	sudo docker build -f scripts/Dockerfile.test-fedora -t ${USER}/qtools-test-fedora .
+	sudo docker run ${USER}/qtools-test-fedora
+
+.PHONY: test-ubuntu
+test-ubuntu:
+	sudo docker build -f scripts/Dockerfile.test-ubuntu -t ${USER}/qtools-test-ubuntu .
+	sudo docker run ${USER}/qtools-test-ubuntu
