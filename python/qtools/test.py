@@ -103,7 +103,7 @@ def test_message(out, url):
     test_send_receive_args(out, url, "--body hello")
     test_send_receive_args(out, url, "--property x y --property a b")
 
-def run_test(url, name):
+def run_test(name, *args):
     sys.stdout.write("{:.<73} ".format(name + " "))
 
     namespace = globals()
@@ -113,7 +113,7 @@ def run_test(url, name):
 
     try:
         with open(output_file, "w") as out:
-            function(out, url)
+            function(out, *args)
     except CalledProcessError:
         print("FAILED")
 
@@ -145,9 +145,9 @@ def main():
 
     try:
         failures = 0
-        failures += run_test(url, "send_receive")
-        failures += run_test(url, "request_respond")
-        failures += run_test(url, "message")
+        failures += run_test("send_receive", url)
+        failures += run_test("request_respond", url)
+        failures += run_test("message", url)
     finally:
         if server is not None:
             stop_process(server)
