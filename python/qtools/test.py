@@ -105,6 +105,7 @@ def test_message(out, url):
 
 def run_test(name, *args):
     sys.stdout.write("{:.<73} ".format(name + " "))
+    sys.stdout.flush()
 
     namespace = globals()
     function = namespace["test_{}".format(name)]
