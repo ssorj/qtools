@@ -24,6 +24,8 @@ from __future__ import unicode_literals
 from __future__ import with_statement
 
 import argparse as _argparse
+import os as _os
+import runpy as _runpy
 import sys as _sys
 
 class Command(object):
@@ -48,6 +50,9 @@ class Command(object):
     def add_argument(self, *args, **kwargs):
         self.parser.add_argument(*args, **kwargs)
 
+    def add_subparsers(self, *args, **kwargs):
+        return self.parser.add_subparsers(*args, **kwargs)
+        
     @property
     def parser(self):
         return self._parser
@@ -73,6 +78,17 @@ class Command(object):
     def epilog(self, text):
         text = text.strip()
         self.parser.epilog = text
+
+    def load_config(self):
+        dir_ = _os.path.expanduser("~")
+        config_file = _os.path.join(dir_, ".config", self.name, "config.py")
+        config = dict()
+
+        if _os.path.exists(config_file):
+            entries = _runpy.run_path(config_file, config)
+            config.update(entries)
+
+        return config
 
     def init(self):
         assert self._args is None

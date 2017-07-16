@@ -26,7 +26,7 @@ from __future__ import with_statement
 import argparse as _argparse
 import binascii as _binascii
 import collections as _collections
-import commandante as _commandante
+import commandant as _commandant
 import json as _json
 import proton as _proton
 import proton.handlers as _handlers
@@ -49,7 +49,7 @@ address URLs:
   amqps://10.0.0.10/jobs/alpha
 """
 
-class MessagingCommand(_commandante.Command):
+class MessagingCommand(_commandant.Command):
     def __init__(self, home_dir, name, handler):
         super(MessagingCommand, self).__init__(home_dir, name)
 

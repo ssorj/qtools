@@ -24,7 +24,7 @@ from __future__ import unicode_literals
 from __future__ import with_statement
 
 import collections as _collections
-import commandante as _commandante
+import commandant as _commandant
 import json as _json
 import proton as _proton
 import sys as _sys
@@ -34,7 +34,7 @@ from .common import *
 
 _description = "Generate AMQP messages"
 
-class MessageCommand(_commandante.Command):
+class MessageCommand(_commandant.Command):
     def __init__(self, home_dir):
         super(MessageCommand, self).__init__(home_dir, "qmessage")
 
