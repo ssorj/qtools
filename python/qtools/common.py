@@ -50,8 +50,8 @@ address URLs:
 """
 
 class MessagingCommand(_commandant.Command):
-    def __init__(self, home_dir, name, handler):
-        super(MessagingCommand, self).__init__(home_dir, name)
+    def __init__(self, home, name, handler):
+        super(MessagingCommand, self).__init__(home, name)
 
         self.container = _reactor.Container(handler)
 

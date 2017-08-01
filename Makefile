@@ -62,7 +62,6 @@ test: devel
 
 .PHONY: big-test
 big-test: test test-centos test-fedora test-ubuntu
-	qtools-test //amqp.zone/queue-$(shell echo $$RANDOM)
 
 .PHONY: test-centos
 test-centos:
@@ -78,3 +77,7 @@ test-fedora:
 test-ubuntu:
 	sudo docker build -f scripts/Dockerfile.test-ubuntu -t ${USER}/qtools-test-ubuntu .
 	sudo docker run ${USER}/qtools-test-ubuntu
+
+.PHONY: update-%
+update-%:
+	curl "https://raw.githubusercontent.com/ssorj/$*/master/python/$*.py" -o python/$*.py

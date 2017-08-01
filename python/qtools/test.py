@@ -22,25 +22,28 @@ import sys
 
 from plano import *
 
-def start_message(args="", **kwargs):
+def open_test_session(session):
+    set_message_threshold("error")
+
+def start_qmessage(args, **kwargs):
     return start_process("qmessage --verbose {}", args, **kwargs)
 
-def start_send(url, args="", **kwargs):
+def start_qsend(url, args, **kwargs):
     return start_process("qsend --verbose {} {}", url, args, **kwargs)
 
-def start_receive(url, args="", **kwargs):
+def start_qreceive(url, args, **kwargs):
     return start_process("qreceive --verbose {} {}", url, args, **kwargs)
 
-def start_request(url, args="", **kwargs):
+def start_qrequest(url, args, **kwargs):
     return start_process("qrequest --verbose {} {}", url, args, **kwargs)
 
-def start_respond(url, args="", **kwargs):
+def start_qrespond(url, args, **kwargs):
     return start_process("qrespond --verbose {} {}", url, args, **kwargs)
 
-def test_send_receive_args(out, url, message_args="", send_args="", receive_args="--count 1"):
-    message_proc = start_message(message_args, stdout=PIPE, stderr=out)
-    send_proc = start_send(url, stdin=message_proc.stdout, stderr=out)
-    receive_proc = start_receive(url, receive_args, stdout=PIPE, stderr=out)
+def send_and_receive(url, qmessage_args="", qsend_args="", qreceive_args="--count 1"):
+    message_proc = start_qmessage(qmessage_args, stdout=PIPE)
+    send_proc = start_qsend(url, qsend_args, stdin=message_proc.stdout)
+    receive_proc = start_qreceive(url, qreceive_args, stdout=PIPE)
 
     try:
         check_process(message_proc)
@@ -57,10 +60,10 @@ def test_send_receive_args(out, url, message_args="", send_args="", receive_args
 
     return output[:-1]
 
-def test_request_respond_args(out, url, message_args="", request_args="", respond_args="--count 1"):
-    message_proc = start_message(message_args, stdout=PIPE, stderr=out)
-    request_proc = start_request(url, stdin=message_proc.stdout, stdout=PIPE, stderr=out)
-    respond_proc = start_respond(url, respond_args, stderr=out)
+def request_and_respond(url, qmessage_args="", qrequest_args="", qrespond_args="--count 1"):
+    message_proc = start_qmessage(qmessage_args, stdout=PIPE)
+    request_proc = start_qrequest(url, qrequest_args, stdin=message_proc.stdout, stdout=PIPE)
+    respond_proc = start_qrespond(url, qrespond_args)
 
     try:
         check_process(message_proc)
@@ -77,83 +80,44 @@ def test_request_respond_args(out, url, message_args="", request_args="", respon
 
     return output[:-1]
 
-def test_send_receive(out, url):
-    body = test_send_receive_args(out, url, "--body abc123", "", "--count 1 --no-prefix")
-    assert body == "abc123", body
-
-    test_send_receive_args(out, url, "", "--presettled")
-    test_send_receive_args(out, url, "--count 10", "", "--count 10")
-    test_send_receive_args(out, url, "--count 10 --rate 1000", "", "--count 10")
-
-def test_request_respond(out, url):
-    body = test_request_respond_args(out, url, "--body abc123", "", "--count 1 --reverse --upper --append ' and this'")
-    assert body == "321CBA and this", body
-
-    test_request_respond_args(out, url, "", "--presettled")
-    test_request_respond_args(out, url, "--count 10", "", "--count 10")
-    test_request_respond_args(out, url, "--count 10 --rate 1000", "", "--count 10")
-
-def test_message(out, url):
-    test_send_receive_args(out, url, "--id m1 --correlation-id c1")
-    test_send_receive_args(out, url, "--user ssorj")
-    test_send_receive_args(out, url, "--to xyz --reply-to abc")
-    test_send_receive_args(out, url, "--durable")
-    test_send_receive_args(out, url, "--priority 100")
-    test_send_receive_args(out, url, "--ttl 100.1")
-    test_send_receive_args(out, url, "--body hello")
-    test_send_receive_args(out, url, "--property x y --property a b")
-
-def run_test(name, *args):
-    sys.stdout.write("{:.<73} ".format(name + " "))
-    sys.stdout.flush()
-
-    namespace = globals()
-    function = namespace["test_{}".format(name)]
-
-    output_file = make_temp_file()
-
-    try:
-        with open(output_file, "w") as out:
-            function(out, *args)
-    except CalledProcessError:
-        print("FAILED")
-
-        for line in read_lines(output_file):
-            eprint("> {}".format(line), end="")
-
-        return 1
-
-    print("PASSED")
-
-    return 0
-
-def main():
-    set_message_threshold("warn")
-
-    parser = argparse.ArgumentParser()
-    parser.add_argument("url", metavar="ADDRESS-URL", nargs="?",
-                        help="An AMQP message address to test against")
-
-    args = parser.parse_args()
-
-    url = args.url
-    server = None
-
-    if url is None:
+class TestServer(object):
+    def __init__(self):
         port = random_port()
-        url = "//127.0.0.1:{}/q1".format(port)
-        server = start_process("qbroker --quiet --port {}", port)
 
-    try:
-        failures = 0
-        failures += run_test("send_receive", url)
-        failures += run_test("request_respond", url)
-        failures += run_test("message", url)
-    finally:
-        if server is not None:
-            stop_process(server)
+        self.proc = start_process("qbroker --quiet --port {}", port)
+        self.proc.url = "//127.0.0.1:{}/q0".format(port)
 
-    if failures == 0:
-        print("All tests passed")
-    else:
-        exit("Some tests failed")
+    def __enter__(self):
+        return self.proc
+
+    def __exit__(self, exc_type, exc_value, traceback):
+        stop_process(self.proc)
+
+def test_send_receive(session):
+    with TestServer() as server:
+        body = send_and_receive(server.url, "--body abc123", "", "--count 1 --no-prefix")
+        assert body == "abc123", body
+
+        send_and_receive(server.url, "", "--presettled")
+        send_and_receive(server.url, "--count 10", "", "--count 10")
+        send_and_receive(server.url, "--count 10 --rate 1000", "", "--count 10")
+
+def test_request_respond(session):
+    with TestServer() as server:
+        body = request_and_respond(server.url, "--body abc123", "", "--count 1 --reverse --upper --append ' and this'")
+        assert body == "321CBA and this", body
+
+        request_and_respond(server.url, "", "--presettled")
+        request_and_respond(server.url, "--count 10", "", "--count 10")
+        request_and_respond(server.url, "--count 10 --rate 1000", "", "--count 10")
+
+def test_message(session):
+    with TestServer() as server:
+        send_and_receive(server.url, "--id m1 --correlation-id c1")
+        send_and_receive(server.url, "--user ssorj")
+        send_and_receive(server.url, "--to xyz --reply-to abc")
+        send_and_receive(server.url, "--durable")
+        send_and_receive(server.url, "--priority 100")
+        send_and_receive(server.url, "--ttl 100.1")
+        send_and_receive(server.url, "--body hello")
+        send_and_receive(server.url, "--property x y --property a b")

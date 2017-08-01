@@ -21,13 +21,14 @@
 import os
 import sys
 
-home_dir = os.path.normpath("@qtools_home@")
-sys.path.insert(0, os.path.join(home_dir, "python"))
+default_home = os.path.normpath("@qtools_home@")
+home = os.environ.get("QTOOLS_HOME", default_home)
+sys.path.insert(0, os.path.join(home, "python"))
 
-from qtools.test import main
+import qtools.test
+
+from commandant import TestCommand
 
 if __name__ == "__main__":
-    try:
-        main()
-    except KeyboardInterrupt:
-        pass
+    command = TestCommand([qtools.test])
+    command.main()
