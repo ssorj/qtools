@@ -21,22 +21,25 @@ For more ways to build and use Docker images and packages, see
  - make
  - python-qpid-proton
 
-### Using Docker images
+### Using Docker
 
     $ sudo docker run -it ssorj/qtools
 
-### Using Fedora packages
+### Installing on Fedora
 
     $ sudo dnf install dnf-plugins-core
     $ sudo dnf copr enable jross/ssorj
     $ sudo dnf install qtools
 
-### Using RHEL 7 packages
+If you don't have `dnf`, use the repo files at
+<https://copr.fedorainfracloud.org/coprs/jross/ssorj/>.
+
+### Installing on RHEL 7
 
     $ cd /etc/yum.repos.d && sudo wget https://copr.fedorainfracloud.org/coprs/jross/ssorj/repo/epel-7/jross-ssorj-epel-7.repo
     $ sudo yum install qtools
 
-### Using Ubuntu packages
+### Installing on Ubuntu
 
 Qtools requires a newer version of python-qpid-proton than Ubuntu
 provides by default.  Use these commands to install it from an Ubuntu
@@ -50,6 +53,14 @@ PPA.
 After this you can install from source.
 
 ### Installing from source
+
+By default, installs from source go to `$HOME/.local`.  Make sure
+`$HOME/.local/bin` is in your path.
+
+    $ cd quiver/
+    $ make install
+
+Use the `PREFIX` option to change the install location.
 
     $ sudo make install PREFIX=/usr/local
 
