@@ -21,11 +21,12 @@
 import os
 import sys
 
-home_dir = os.path.normpath("@qtools_home@")
-sys.path.insert(0, os.path.join(home_dir, "python"))
+default_home = os.path.normpath("@qtools_home@")
+home = os.environ.get("QTOOLS_HOME", default_home)
+sys.path.insert(0, os.path.join(home, "python"))
 
 from qtools.respond import RespondCommand
 
 if __name__ == "__main__":
-    command = RespondCommand(home_dir)
+    command = RespondCommand(home)
     command.main()
