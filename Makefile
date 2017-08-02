@@ -65,17 +65,17 @@ big-test: test test-centos test-fedora test-ubuntu
 
 .PHONY: test-centos
 test-centos:
-	sudo docker build -f scripts/Dockerfile.test-centos -t ${USER}/qtools-test-centos .
+	sudo docker build -f scripts/test-centos.dockerfile -t ${USER}/qtools-test-centos --build-arg CACHE_BUST=$${RANDOM} .
 	sudo docker run ${USER}/qtools-test-centos
 
 .PHONY: test-fedora
 test-fedora:
-	sudo docker build -f scripts/Dockerfile.test-fedora -t ${USER}/qtools-test-fedora .
+	sudo docker build -f scripts/test-fedora.dockerfile -t ${USER}/qtools-test-fedora --build-arg CACHE_BUST=$${RANDOM} .
 	sudo docker run ${USER}/qtools-test-fedora
 
 .PHONY: test-ubuntu
 test-ubuntu:
-	sudo docker build -f scripts/Dockerfile.test-ubuntu -t ${USER}/qtools-test-ubuntu .
+	sudo docker build -f scripts/test-ubuntu.dockerfile -t ${USER}/qtools-test-ubuntu --build-arg CACHE_BUST=$${RANDOM} .
 	sudo docker run ${USER}/qtools-test-ubuntu
 
 .PHONY: update-%
