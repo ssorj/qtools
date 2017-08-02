@@ -17,22 +17,32 @@
 # under the License.
 #
 
-DESTDIR := ""
-PREFIX := ${HOME}/.local
-QTOOLS_HOME = ${PREFIX}/share/qtools
+.NOTPARALLEL:
 
-export PATH := install/bin:${PATH}
-export PYTHONPATH := python
+DESTDIR := ""
+PREFIX := /usr/local
+INSTALLED_QTOOLS_HOME = ${PREFIX}/lib/qtools
+
+export QTOOLS_HOME = ${PWD}/build/qtools
+export PATH := ${PWD}/build/bin:${PATH}
+export PYTHONPATH := ${QTOOLS_HOME}/python:${PWD}/python:${PYTHONPATH}
+
+VERSION := $(shell cat VERSION.txt)
+
+BIN_SOURCES := $(shell find bin -type f -name \*.in)
+BIN_TARGETS := ${BIN_SOURCES:%.in=build/%}
+
+PYTHON_SOURCES := $(shell find python -type f -name \*.py)
+PYTHON_TARGETS := ${PYTHON_SOURCES:%=build/qtools/%} ${PYTHON_SOURCES:%.in=build/qtools/%}
 
 .PHONY: default
-default: devel
+default: build
 
 .PHONY: help
 help:
 	@echo "build          Build the code"
 	@echo "install        Install the code"
 	@echo "clean          Clean up the source tree"
-	@echo "devel          Build, install, and run a basic test in this checkout"
 	@echo "test           Run the tests"
 
 .PHONY: clean
@@ -40,24 +50,18 @@ clean:
 	find python -type f -name \*.pyc -delete
 	find python -type d -name __pycache__ -delete
 	rm -rf build
-	rm -rf install
 
 .PHONY: build
-build:
-	scripts/configure-files -a qtools_home=${QTOOLS_HOME} bin/*.in build/bin
+build: ${BIN_TARGETS} ${PYTHON_TARGETS} build/prefix.txt
+	scripts/run-smoke-tests
 
 .PHONY: install
 install: build
-	scripts/install-files build/bin ${DESTDIR}${PREFIX}/bin
-	scripts/install-files -n \*.py python ${DESTDIR}${QTOOLS_HOME}/python
+	scripts/install-files build/bin ${DESTDIR}$$(cat build/prefix.txt)/bin
+	scripts/install-files build/qtools ${DESTDIR}$$(cat build/prefix.txt)/lib/qtools
 
-.PHONY: devel
-devel: PREFIX := ${PWD}/install
-devel: install
-	scripts/run-smoke-tests
-
-.PHONY:
-test: devel
+.PHONY: test
+test: build
 	qtools-test
 
 .PHONY: big-test
@@ -77,6 +81,16 @@ test-fedora:
 test-ubuntu:
 	sudo docker build -f scripts/test-ubuntu.dockerfile -t ${USER}/qtools-test-ubuntu --build-arg CACHE_BUST=$${RANDOM} .
 	sudo docker run ${USER}/qtools-test-ubuntu
+
+build/prefix.txt:
+	echo ${PREFIX} > build/prefix.txt
+
+build/bin/%: bin/%.in
+	scripts/configure-file -a qtools_home=${INSTALLED_QTOOLS_HOME} $< $@
+
+build/qtools/python/%: python/%
+	@mkdir -p ${@D}
+	cp $< $@
 
 .PHONY: update-%
 update-%:
