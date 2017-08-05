@@ -111,6 +111,15 @@ class _Handler(LinkHandler):
         if not self.command.ready.is_set():
             return
 
+        sender = event.link
+
+        if sender is None:
+            sender = self.senders.pop()
+            self.senders.appendleft(sender)
+
+        if not sender.credit:
+            return
+
         try:
             line = self.command.input_thread.lines.pop()
         except IndexError:
@@ -125,16 +134,6 @@ class _Handler(LinkHandler):
             if self.sent_messages == self.settled_messages:
                 self.close(event)
 
-            return
-
-        sender = event.link
-
-        if sender is None:
-            sender = self.senders.pop()
-            self.senders.appendleft(sender)
-
-        if not sender.credit:
-            self.command.input_thread.lines.append(line)
             return
 
         message = process_input_line(line)

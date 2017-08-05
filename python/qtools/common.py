@@ -233,13 +233,14 @@ class _InputThread(_InputOutputThread):
                 line = f.readline()
 
                 if line == "":
-                    self.lines.appendleft(DONE)
-                    self.command.events.trigger(_reactor.ApplicationEvent("input"))
-                    
+                    self.push_line(DONE)
                     return
 
-                self.lines.appendleft(line[:-1])
-                self.command.events.trigger(_reactor.ApplicationEvent("input"))
+                self.push_line(line[:-1])
+
+    def push_line(self, line):
+        self.lines.appendleft(line)
+        self.command.events.trigger(_reactor.ApplicationEvent("input"))
 
 class _OutputThread(_InputOutputThread):
     def run(self):
@@ -261,6 +262,10 @@ class _OutputThread(_InputOutputThread):
 
                     f.write(line + "\n")
                     f.flush()
+
+    def push_line(self, line):
+        self.lines.appendleft(line)
+        self.lines_queued.set()
 
 def _summarize(entity):
     if isinstance(entity, _proton.Connection):

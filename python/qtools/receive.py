@@ -145,9 +145,7 @@ class _Handler(LinkHandler):
                           event.connection)
 
         if self.received_messages == self.command.max_count:
-            self.command.output_thread.lines.appendleft(DONE)
-            self.command.output_thread.lines_queued.set()
-
+            self.command.output_thread.push_line(DONE)
             self.done_receiving = True
             self.close(event)
 
@@ -159,7 +157,5 @@ class _Handler(LinkHandler):
                             plural("message", self.received_messages))
 
     def write_line(self, template="", *args):
-        string = template.format(*args)
-
-        self.command.output_thread.lines.appendleft(string)
-        self.command.output_thread.lines_queued.set()
+        line = template.format(*args)
+        self.command.output_thread.push_line(line)
