@@ -178,8 +178,7 @@ class _Handler(LinkHandler):
         else:
             out = message.body
 
-        self.command.output_thread.lines.appendleft(out)
-        self.command.output_thread.lines_queued.set()
+        self.command.output_thread.push_line(out)
 
         self.command.info("Received response {} from {} on {}",
                           event.message,
@@ -187,9 +186,7 @@ class _Handler(LinkHandler):
                           event.connection)
 
         if self.sent_requests == self.received_responses:
-            self.command.output_thread.lines.appendleft(DONE)
-            self.command.output_thread.lines_queued.set()
-
+            self.command.output_thread.push_line(DONE)
             self.done_receiving = True
             self.close(event)
 
