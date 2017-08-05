@@ -65,7 +65,7 @@ class RequestCommand(MessagingCommand):
 
         self.init_link_attributes()
 
-        self.json = self.args.json
+        self.json_enabled = self.args.json
         self.presettled = self.args.presettled
 
         if self.args.input is not None:
@@ -76,8 +76,7 @@ class RequestCommand(MessagingCommand):
 
         if self.args.message:
             for value in self.args.message:
-                message = _proton.Message(unicode(value))
-                self.input_thread.send(message)
+                self.input_thread.lines.appendleft(unicode(value))
 
             self.input_thread.close()
 
@@ -96,7 +95,6 @@ class _Handler(LinkHandler):
 
         self.sent_requests = 0
         self.received_responses = 0
-        self.stop_requested = False
 
     def open_links(self, event, connection, address):
         options = None
@@ -119,15 +117,23 @@ class _Handler(LinkHandler):
         self.send_message(event)
 
     def send_message(self, event):
-        if self.command.done.is_set():
+        if self.done_sending:
             return
 
         if not self.command.ready.is_set():
             return
 
         try:
-            message = self.command.input_thread.messages.pop()
+            line = self.command.input_thread.lines.pop()
         except IndexError:
+            return
+
+        if line is DONE:
+            self.done_sending = True
+
+            if self.sent_requests == self.received_responses:
+                self.close(event)
+
             return
 
         sender = event.link
@@ -137,10 +143,12 @@ class _Handler(LinkHandler):
             self.senders.appendleft(sender)
 
         if not sender.credit:
-            self.command.input_thread.messages.append(message)
+            self.command.input_thread.lines.append(line)
             return
 
         receiver = self.receivers_by_sender[sender]
+
+        message = process_input_line(line)
         message.reply_to = receiver.remote_source.address
 
         if message.address is None:
@@ -157,12 +165,21 @@ class _Handler(LinkHandler):
                           sender.connection)
 
     def on_message(self, event):
-        if self.command.done.is_set():
+        if self.done_receiving:
             return
+
+        message = event.message
 
         self.received_responses += 1
 
-        self.command.output_thread.send(event.delivery)
+        if self.command.json_enabled:
+            data = convert_message_to_data(message)
+            out = _json.dumps(data)
+        else:
+            out = message.body
+
+        self.command.output_thread.lines.appendleft(out)
+        self.command.output_thread.lines_queued.set()
 
         self.command.info("Received response {} from {} on {}",
                           event.message,
@@ -170,13 +187,14 @@ class _Handler(LinkHandler):
                           event.connection)
 
         if self.sent_requests == self.received_responses:
-            self.command.done.set()
-            self.command.output_thread.send(None)
+            self.command.output_thread.lines.appendleft(DONE)
+            self.command.output_thread.lines_queued.set()
 
-    def close(self):
-        self.command.print("XXX Closing main")
+            self.done_receiving = True
+            self.close(event)
 
-        super(_Handler, self).close()
+    def close(self, event):
+        super(_Handler, self).close(event)
 
         self.command.notice("Sent {} {} and received {} {}",
                             self.sent_requests,

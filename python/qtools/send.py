@@ -105,15 +105,26 @@ class _Handler(LinkHandler):
         self.send_message(event)
 
     def send_message(self, event):
-        if self.command.done.is_set():
+        if self.done_sending:
             return
 
         if not self.command.ready.is_set():
             return
 
         try:
-            message = self.command.input_thread.messages.pop()
+            line = self.command.input_thread.lines.pop()
         except IndexError:
+            return
+
+        if line is DONE:
+            self.done_sending = True
+
+            if self.command.presettled:
+                self.close(event)
+
+            if self.sent_messages == self.settled_messages:
+                self.close(event)
+
             return
 
         sender = event.link
@@ -123,8 +134,10 @@ class _Handler(LinkHandler):
             self.senders.appendleft(sender)
 
         if not sender.credit:
-            self.command.input_thread.messages.append(message)
+            self.command.input_thread.lines.append(line)
             return
+
+        message = process_input_line(line)
 
         if message.address is None:
             message.address = sender.target.address
@@ -144,14 +157,12 @@ class _Handler(LinkHandler):
 
         self.settled_messages += 1
 
-        if self.command.done.is_set() and self.sent_messages == self.settled_messages:
-            self.close()
+        if self.done_sending and self.sent_messages == self.settled_messages:
+            self.close(event)
 
-    def close(self):
-        super(_Handler, self).close()
+    def close(self, event):
+        super(_Handler, self).close(event)
 
         self.command.notice("Sent {} {}",
                             self.sent_messages,
                             plural("message", self.sent_messages))
-
-        print_threads()

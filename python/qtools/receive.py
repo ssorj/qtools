@@ -77,7 +77,7 @@ class ReceiveCommand(MessagingCommand):
 
         if self.args.output is not None:
             self.output_file = open(self.args.output, "w")
-
+            
     def run(self):
         self.output_thread.start()
         super(ReceiveCommand, self).run()
@@ -92,7 +92,7 @@ class _Handler(LinkHandler):
         return event.container.create_receiver(connection, address),
 
     def on_message(self, event):
-        if self.command.done.is_set():
+        if self.done_receiving:
             return
 
         self.received_messages += 1
@@ -104,37 +104,40 @@ class _Handler(LinkHandler):
             if message.instructions is not None:
                 for name in sorted(message.instructions):
                     value = message.instructions[name]
-                    self.writeln("[delivery annotation] {}: {}", name, value)
+                    self.write_line("[delivery annotation] {}: {}", name, value)
 
             if message.annotations is not None:
                 for name in sorted(message.annotations):
                     value = message.annotations[name]
-                    self.writeln("[message annotation] {}: {}", name, value)
+                    self.write_line("[message annotation] {}: {}", name, value)
 
         if self.command.properties_enabled:
             if message.properties is not None:
                 for name in sorted(message.properties):
                     value = message.properties[name]
-                    self.writeln("[property] {}: {}", name, value)
+                    self.write_line("[property] {}: {}", name, value)
 
         if self.command.router_trace_enabled:
             value = message.annotations.get("x-opt-qd.trace")
             value = ", ".join(value)
 
             if value is not None:
-                self.writeln("[router trace] {}", value)
+                self.write_line("[router trace] {}", value)
+
+        out = list()
 
         if not self.command.prefix_disabled:
             prefix = event.link.source.address + ": "
-            self.write(prefix)
+            out.append(prefix)
 
         if self.command.json_enabled:
             data = convert_message_to_data(message)
-            _json.dump(data, self.command.output_file)
+            json = _json.dumps(data)
+            out.append(json)
         else:
-            self.write(message.body)
+            out.append(message.body)
 
-        self.writeln()
+        self.write_line("".join(out))
 
         self.command.info("Received {} from {} on {}",
                           message,
@@ -142,27 +145,21 @@ class _Handler(LinkHandler):
                           event.connection)
 
         if self.received_messages == self.command.max_count:
-            self.command.done.set()
-            self.command.output_thread.send(None)
+            self.command.output_thread.lines.appendleft(DONE)
+            self.command.output_thread.lines_queued.set()
 
-    def close(self):
-        super(_Handler, self).close()
+            self.done_receiving = True
+            self.close(event)
+
+    def close(self, event):
+        super(_Handler, self).close(event)
 
         self.command.notice("Received {} {}",
                             self.received_messages,
                             plural("message", self.received_messages))
 
-        print_threads()
-
-    def write(self, template=None, *args):
-        #self.command.output_thread.send((event.delivery, event.message))
-
-        if template is None:
-            return
-
+    def write_line(self, template="", *args):
         string = template.format(*args)
-        self.command.output_file.write(string)
 
-    def writeln(self, template=None, *args):
-        self.write(template, *args)
-        self.write(_os.linesep)
+        self.command.output_thread.lines.appendleft(string)
+        self.command.output_thread.lines_queued.set()
