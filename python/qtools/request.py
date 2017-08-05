@@ -117,10 +117,19 @@ class _Handler(LinkHandler):
         self.send_message(event)
 
     def send_message(self, event):
+        if not self.command.ready.is_set():
+            return
+
         if self.done_sending:
             return
 
-        if not self.command.ready.is_set():
+        sender = event.link
+
+        if sender is None:
+            sender = self.senders.pop()
+            self.senders.appendleft(sender)
+
+        if not sender.credit:
             return
 
         try:
@@ -134,16 +143,6 @@ class _Handler(LinkHandler):
             if self.sent_requests == self.received_responses:
                 self.close(event)
 
-            return
-
-        sender = event.link
-
-        if sender is None:
-            sender = self.senders.pop()
-            self.senders.appendleft(sender)
-
-        if not sender.credit:
-            self.command.input_thread.lines.append(line)
             return
 
         receiver = self.receivers_by_sender[sender]

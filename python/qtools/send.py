@@ -105,10 +105,10 @@ class _Handler(LinkHandler):
         self.send_message(event)
 
     def send_message(self, event):
-        if self.done_sending:
+        if not self.command.ready.is_set():
             return
 
-        if not self.command.ready.is_set():
+        if self.done_sending:
             return
 
         sender = event.link
