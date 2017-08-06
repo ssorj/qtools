@@ -20,9 +20,9 @@
 FROM fedora
 MAINTAINER Justin Ross <jross@apache.org>
 
-RUN dnf -qy update && dnf -q clean all
+RUN dnf -qy --setopt deltarpm=0 update && dnf -q clean all
 
-RUN dnf -qy install findutils make python-qpid-proton && dnf -q clean all
+RUN dnf -qy --setopt deltarpm=0 install findutils make python-qpid-proton && dnf -q clean all
 
 COPY . /root/qtools
 
