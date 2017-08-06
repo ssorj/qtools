@@ -57,6 +57,8 @@ class RequestCommand(MessagingCommand):
                           help="Write response messages to FILE (default stdout)")
         self.add_argument("--json", action="store_true",
                           help="Write messages in JSON format")
+        self.add_argument("--no-prefix", action="store_true",
+                          help="Suppress address prefix")
         self.add_argument("--presettled", action="store_true",
                           help="Send messages fire-and-forget (at-most-once delivery)")
 
@@ -66,6 +68,7 @@ class RequestCommand(MessagingCommand):
         self.init_link_attributes()
 
         self.json_enabled = self.args.json
+        self.prefix_disabled = self.args.no_prefix
         self.presettled = self.args.presettled
 
         if self.args.input is not None:
@@ -92,6 +95,7 @@ class _Handler(LinkHandler):
 
         self.senders = _collections.deque()
         self.receivers_by_sender = dict()
+        self.senders_by_receiver = dict()
 
         self.sent_requests = 0
         self.received_responses = 0
@@ -107,6 +111,7 @@ class _Handler(LinkHandler):
 
         self.senders.appendleft(sender)
         self.receivers_by_sender[sender] = receiver
+        self.senders_by_receiver[receiver] = sender
 
         return sender, receiver
 
@@ -153,6 +158,9 @@ class _Handler(LinkHandler):
         if message.address is None:
             message.address = sender.target.address
 
+        if message.id is None:
+            message.id = unique_id()
+
         delivery = sender.send(message)
 
         self.sent_requests += 1
@@ -171,13 +179,21 @@ class _Handler(LinkHandler):
 
         self.received_responses += 1
 
+        out = list()
+
+        if not self.command.prefix_disabled:
+            sender = self.senders_by_receiver[event.link]
+            prefix = sender.target.address + ": "
+            out.append(prefix)
+
         if self.command.json_enabled:
             data = convert_message_to_data(message)
-            out = _json.dumps(data)
+            json = _json.dumps(data)
+            out.append(json)
         else:
-            out = message.body
+            out.append(message.body)
 
-        self.command.output_thread.push_line(out)
+        self.command.output_thread.push_line("".join(out))
 
         self.command.info("Received response {} from {} on {}",
                           event.message,

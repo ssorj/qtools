@@ -145,7 +145,7 @@ class _Handler(LinkHandler):
 
         response = _proton.Message()
         response.address = request.reply_to
-        response.correlation_id = request.correlation_id
+        response.correlation_id = request.id
 
         try:
             self.command.process(request, response)

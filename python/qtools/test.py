@@ -104,7 +104,7 @@ def test_send_receive(session):
 
 def test_request_respond(session):
     with TestServer() as server:
-        body = request_and_respond(server.url, "--body abc123", "", "--count 1 --reverse --upper --append ' and this'")
+        body = request_and_respond(server.url, "--body abc123", "--no-prefix", "--count 1 --reverse --upper --append ' and this'")
         assert body == "321CBA and this", body
 
         request_and_respond(server.url, "", "--presettled")
