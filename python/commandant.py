@@ -28,6 +28,7 @@ import fnmatch as _fnmatch
 import inspect as _inspect
 import os as _os
 import runpy as _runpy
+import signal as _signal
 import sys as _sys
 import tempfile as _tempfile
 import time as _time
@@ -149,6 +150,12 @@ class Command(object):
         _sys.stderr.write("{}\n".format(message))
         _sys.stderr.flush()
 
+class TestTimedOut(Exception):
+    pass
+
+class TestSkipped(Exception):
+    pass
+
 _test_epilog = """
 patterns:
   The --include and --exclude options take comma-separated lists of
@@ -179,6 +186,8 @@ class TestCommand(Command):
                           help="Do not run tests with names matching PATTERNS")
         self.add_argument("--iterations", metavar="COUNT", type=int, default=1,
                           help="Run the tests COUNT times (default 1)")
+        self.add_argument("--timeout", metavar="SECONDS", type=int, default=300,
+                          help="Fail any test running longer than SECONDS (default 300)")
 
     def init(self):
         super(TestCommand, self).init()
@@ -187,6 +196,7 @@ class TestCommand(Command):
         self.include_patterns = self.args.include.split(",")
         self.exclude_patterns = []
         self.iterations = self.args.iterations
+        self.test_timeout = self.args.timeout
 
         if self.args.exclude is not None:
             self.exclude_patterns = self.args.exclude.split(",")
@@ -326,11 +336,15 @@ class _TestModule(object):
             self.command.notice("Running {}", function)
 
             try:
-                function(session)
+                with _Timer(self.command.test_timeout):
+                    function(session)
             except KeyboardInterrupt:
                 raise
             except:
                 session.failed_tests.append(function)
+
+                _traceback.print_exc()
+
                 self.command.error("{} FAILED ({})", function, _elapsed_time(start_time))
 
                 return
@@ -345,11 +359,15 @@ class _TestModule(object):
             try:
                 with open(output_file, "w") as out:
                     with _OutputRedirected(out, out):
-                        function(session)
+                        with _Timer(self.command.test_timeout):
+                            function(session)
             except KeyboardInterrupt:
                 raise
             except:
                 session.failed_tests.append(function)
+
+                _traceback.print_exc()
+
                 self._print("FAILED {:>6}".format(_elapsed_time(start_time)))
 
                 with open(output_file, "r") as out:
@@ -358,8 +376,6 @@ class _TestModule(object):
                         _sys.stderr.write(line)
 
                 _sys.stderr.flush()
-
-                _traceback.print_exc()
 
                 return
             finally:
@@ -410,3 +426,17 @@ class _OutputRedirected(object):
     def flush(self):
         _sys.stdout.flush()
         _sys.stderr.flush()
+
+class _Timer(object):
+    def __init__(self, seconds):
+        self.seconds = seconds
+
+    def __enter__(self):
+        _signal.signal(_signal.SIGALRM, self.raise_timeout)
+        _signal.alarm(self.seconds)
+
+    def __exit__(self, exc_type, exc_value, traceback):
+        _signal.alarm(0)
+
+    def raise_timeout(self, *args):
+        raise TestTimedOut()
