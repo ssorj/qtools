@@ -20,9 +20,9 @@
 FROM centos
 MAINTAINER Justin Ross <jross@apache.org>
 
-RUN yum -qy update && yum -q clean all
+RUN yum -q -y update && yum -q clean all
 
-RUN yum -y install make python-qpid-proton && yum -q clean all
+RUN yum -q -y install make python-qpid-proton && yum -q clean all
 
 COPY . /root/qtools
 

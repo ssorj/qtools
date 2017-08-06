@@ -22,10 +22,10 @@ MAINTAINER Justin Ross <jross@apache.org>
 
 RUN apt-get -qq update && apt-get -qq -y upgrade
 
-RUN apt-get -y install software-properties-common \
+RUN apt-get -qq -y install software-properties-common \
     && add-apt-repository -y ppa:qpid/released \
     && apt-get -qq update \
-    && apt-get -y install make python-qpid-proton
+    && apt-get -qq -y install make python-qpid-proton
 
 COPY . /root/qtools
 

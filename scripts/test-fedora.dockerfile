@@ -22,7 +22,7 @@ MAINTAINER Justin Ross <jross@apache.org>
 
 RUN dnf -qy update && dnf -q clean all
 
-RUN dnf -y install findutils make python-qpid-proton && dnf -q clean all
+RUN dnf -qy install findutils make python-qpid-proton && dnf -q clean all
 
 COPY . /root/qtools
 
