@@ -66,12 +66,11 @@ class SendCommand(MessagingCommand):
         if self.args.input is not None:
             self.input_file = open(self.args.input, "r")
 
-        for value in self.args.message:
-            message = _proton.Message(unicode(value))
-            self.send_input(message)
+        if self.args.message:
+            for value in self.args.message:
+                self.input_thread.push_line(unicode(value))
 
-        if self.input_messages:
-            self.send_input(None)
+            self.input_thread.push_line(DONE)
 
     def run(self):
         self.input_thread.start()
@@ -85,7 +84,6 @@ class _Handler(LinkHandler):
 
         self.sent_messages = 0
         self.settled_messages = 0
-        self.stop_requested = False
 
     def open_links(self, event, connection, address):
         options = None
@@ -99,41 +97,17 @@ class _Handler(LinkHandler):
 
         return sender,
 
-    def on_sendable(self, event):
-        self.send_message(event)
-
     def on_input(self, event):
         self.send_message(event)
 
-    def on_settled(self, event):
-        super(_Handler, self).on_settled(event)
-
-        self.settled_messages += 1
-
-        if self.stop_requested and self.sent_messages == self.settled_messages:
-            self.close()
+    def on_sendable(self, event):
+        self.send_message(event)
 
     def send_message(self, event):
-        if self.stop_requested:
-            return
-
         if not self.command.ready.is_set():
             return
 
-        try:
-            message = self.command.input_messages.pop()
-        except IndexError:
-            return
-
-        if message is None:
-            if self.sent_messages == self.settled_messages:
-                self.close()
-            else:
-                if self.command.presettled:
-                    self.close()
-                else:
-                    self.stop_requested = True
-
+        if self.done_sending:
             return
 
         sender = event.link
@@ -143,8 +117,25 @@ class _Handler(LinkHandler):
             self.senders.appendleft(sender)
 
         if not sender.credit:
-            self.command.input_messages.append(message)
             return
+
+        try:
+            line = self.command.input_thread.lines.pop()
+        except IndexError:
+            return
+
+        if line is DONE:
+            self.done_sending = True
+
+            if self.command.presettled:
+                self.close(event)
+
+            if self.sent_messages == self.settled_messages:
+                self.close(event)
+
+            return
+
+        message = process_input_line(line)
 
         if message.address is None:
             message.address = sender.target.address
@@ -159,8 +150,16 @@ class _Handler(LinkHandler):
                           sender.target,
                           sender.connection)
 
-    def close(self):
-        super(_Handler, self).close()
+    def on_settled(self, event):
+        super(_Handler, self).on_settled(event)
+
+        self.settled_messages += 1
+
+        if self.done_sending and self.sent_messages == self.settled_messages:
+            self.close(event)
+
+    def close(self, event):
+        super(_Handler, self).close(event)
 
         self.command.notice("Sent {} {}",
                             self.sent_messages,

@@ -28,10 +28,12 @@ import binascii as _binascii
 import collections as _collections
 import commandant as _commandant
 import json as _json
+import os as _os
 import proton as _proton
 import proton.handlers as _handlers
 import proton.reactor as _reactor
 import sys as _sys
+import time as _time
 import threading as _threading
 import uuid as _uuid
 
@@ -60,12 +62,11 @@ class MessagingCommand(_commandant.Command):
 
         self.input_file = _sys.stdin
         self.input_thread = _InputThread(self)
-        self.input_messages = _collections.deque()
 
         self.output_file = _sys.stdout
+        self.output_thread = _OutputThread(self)
 
         self.ready = _threading.Event()
-        self.done = _threading.Event()
 
         self.add_argument("--id", metavar="ID",
                           help="Set the container identity to ID")
@@ -127,51 +128,12 @@ class MessagingCommand(_commandant.Command):
 
         return scheme, host, port, path
 
-    def send_input(self, message):
-        self.input_messages.appendleft(message)
-        self.events.trigger(_reactor.ApplicationEvent("input"))
-
     def run(self):
         self.container.run()
 
-    def print(self, message, *args):
+    def print_message(self, message, *args):
         summarized_args = [_summarize(x) for x in args]
-        super(MessagingCommand, self).print(message, *summarized_args)
-
-class _InputThread(_threading.Thread):
-    def __init__(self, command):
-        _threading.Thread.__init__(self)
-
-        assert isinstance(command, MessagingCommand)
-
-        self.command = command
-        self.daemon = True
-
-    def run(self):
-        self.command.ready.wait()
-
-        with self.command.input_file as f:
-            while True:
-                if self.command.done.is_set():
-                    break
-
-                string = f.readline()
-
-                if string == "":
-                    self.command.send_input(None)
-                    break
-
-                if string.endswith("\n"):
-                    string = string[:-1]
-
-                if string.startswith("{") and string.endswith("}"):
-                    data = _json.loads(string)
-                    message = convert_data_to_message(data)
-                else:
-                    string = unicode(string)
-                    message = _proton.Message(string)
-
-                self.command.send_input(message)
+        super(MessagingCommand, self).print_message(message, *summarized_args)
 
 class LinkHandler(_handlers.MessagingHandler):
     def __init__(self, command, **kwargs):
@@ -183,6 +145,9 @@ class LinkHandler(_handlers.MessagingHandler):
         self.links = list()
 
         self.opened_links = 0
+
+        self.done_sending = False
+        self.done_receiving = False
 
     def on_start(self, event):
         for url in self.command.urls:
@@ -240,13 +205,67 @@ class LinkHandler(_handlers.MessagingHandler):
         elif delivery.remote_state == delivery.MODIFIED:
             self.command.notice(template, "modified")
 
-    def close(self):
-        self.command.done.set()
-
+    def close(self, event):
         for connection in self.connections:
             connection.close()
 
         self.command.events.close()
+
+DONE = object()
+
+class _InputOutputThread(_threading.Thread):
+    def __init__(self, command):
+        _threading.Thread.__init__(self)
+
+        self.command = command
+        self.name = self.__class__.__name__
+        self.daemon = True
+
+        self.lines = _collections.deque()
+        self.lines_queued = _threading.Event()
+
+    def push_line(self, line):
+        self.lines.appendleft(line)
+        self.lines_queued.set()
+
+class _InputThread(_InputOutputThread):
+    def run(self):
+        self.command.ready.wait()
+
+        with self.command.input_file as f:
+            while True:
+                line = f.readline()
+
+                if line == "":
+                    self.push_line(DONE)
+                    return
+
+                self.push_line(line[:-1])
+
+    def push_line(self, line):
+        super(_InputThread, self).push_line(line)
+        self.command.events.trigger(_reactor.ApplicationEvent("input"))
+
+class _OutputThread(_InputOutputThread):
+    def run(self):
+        self.command.ready.wait()
+
+        with self.command.output_file as f:
+            while True:
+                self.lines_queued.wait()
+                self.lines_queued.clear()
+
+                while True:
+                    try:
+                        line = self.lines.pop()
+                    except IndexError:
+                        break
+
+                    if line is DONE:
+                        return
+
+                    f.write(line + "\n")
+                    f.flush()
 
 def _summarize(entity):
     if isinstance(entity, _proton.Connection):
@@ -299,20 +318,18 @@ def _summarize_message(message):
 
     return "message '{}'".format(desc)
 
-def unique_id():
-    bytes_ = _uuid.uuid4().bytes[:2]
-    hex_ = _binascii.hexlify(bytes_).decode("utf-8")
+def process_input_line(line):
+    if line.endswith("\n"):
+        line = line[:-1]
 
-    return hex_
+    if line.startswith("{") and line.endswith("}"):
+        data = _json.loads(line)
+        message = convert_data_to_message(data)
+    else:
+        line = unicode(line)
+        message = _proton.Message(line)
 
-def plural(word, count, override=None):
-    if count == 1:
-        return word
-
-    if override is not None:
-        return override
-
-    return word + "s"
+    return message
 
 def convert_data_to_message(data):
     message = _proton.Message()
@@ -381,3 +398,18 @@ def _set_data_attribute(data, dname, message, mname, omit_if_empty=True):
         return
 
     data[dname] = getattr(message, mname)
+
+def unique_id():
+    bytes_ = _uuid.uuid4().bytes[:2]
+    hex_ = _binascii.hexlify(bytes_).decode("utf-8")
+
+    return hex_
+
+def plural(word, count, override=None):
+    if count == 1:
+        return word
+
+    if override is not None:
+        return override
+
+    return word + "s"

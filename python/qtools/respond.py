@@ -131,7 +131,7 @@ class _Handler(LinkHandler):
         return receiver, sender
 
     def on_message(self, event):
-        if self.processed_requests == self.command.max_count:
+        if self.done_receiving:
             return
 
         delivery = event.delivery
@@ -145,7 +145,7 @@ class _Handler(LinkHandler):
 
         response = _proton.Message()
         response.address = request.reply_to
-        response.correlation_id = request.correlation_id
+        response.correlation_id = request.id
 
         try:
             self.command.process(request, response)
@@ -172,10 +172,11 @@ class _Handler(LinkHandler):
             self.reject(delivery)
 
         if self.processed_requests == self.command.max_count:
-            self.close()
+            self.done_receiving = True
+            self.close(event)
 
-    def close(self):
-        super(_Handler, self).close()
+    def close(self, event):
+        super(_Handler, self).close(event)
 
         self.command.notice("Processed {} {}",
                             self.processed_requests,
