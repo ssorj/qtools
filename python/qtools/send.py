@@ -68,10 +68,9 @@ class SendCommand(MessagingCommand):
 
         if self.args.message:
             for value in self.args.message:
-                message = _proton.Message(unicode(value))
-                self.input_thread.send(message)
+                self.input_thread.push_line(unicode(value))
 
-            self.input_thread.close()
+            self.input_thread.push_line(DONE)
 
     def run(self):
         self.input_thread.start()

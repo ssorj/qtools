@@ -76,9 +76,9 @@ class RequestCommand(MessagingCommand):
 
         if self.args.message:
             for value in self.args.message:
-                self.input_thread.lines.appendleft(unicode(value))
+                self.input_thread.push_line(unicode(value))
 
-            self.input_thread.close()
+            self.input_thread.push_line(DONE)
 
     def run(self):
         self.input_thread.start()
@@ -184,7 +184,7 @@ class _Handler(LinkHandler):
                           event.link.source,
                           event.connection)
 
-        if self.sent_requests == self.received_responses:
+        if self.done_sending and self.sent_requests == self.received_responses:
             self.command.output_thread.push_line(DONE)
             self.done_receiving = True
             self.close(event)

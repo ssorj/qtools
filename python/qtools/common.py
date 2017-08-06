@@ -224,6 +224,10 @@ class _InputOutputThread(_threading.Thread):
         self.lines = _collections.deque()
         self.lines_queued = _threading.Event()
 
+    def push_line(self, line):
+        self.lines.appendleft(line)
+        self.lines_queued.set()
+
 class _InputThread(_InputOutputThread):
     def run(self):
         self.command.ready.wait()
@@ -239,7 +243,7 @@ class _InputThread(_InputOutputThread):
                 self.push_line(line[:-1])
 
     def push_line(self, line):
-        self.lines.appendleft(line)
+        super(_InputThread, self).push_line(line)
         self.command.events.trigger(_reactor.ApplicationEvent("input"))
 
 class _OutputThread(_InputOutputThread):
@@ -262,10 +266,6 @@ class _OutputThread(_InputOutputThread):
 
                     f.write(line + "\n")
                     f.flush()
-
-    def push_line(self, line):
-        self.lines.appendleft(line)
-        self.lines_queued.set()
 
 def _summarize(entity):
     if isinstance(entity, _proton.Connection):
