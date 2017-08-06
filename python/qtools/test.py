@@ -99,6 +99,7 @@ def test_send_receive(session):
         assert body == "abc123", body
 
         send_and_receive(server.url, "", "--presettled")
+        send_and_receive(server.url, "", "-m abc --message xyz", "--count 2")
         send_and_receive(server.url, "--count 10", "", "--count 10")
         send_and_receive(server.url, "--count 10 --rate 1000", "", "--count 10")
 
@@ -108,6 +109,7 @@ def test_request_respond(session):
         assert body == "321CBA and this", body
 
         request_and_respond(server.url, "", "--presettled")
+        request_and_respond(server.url, "", "-m abc --message xyz", "--count 2")
         request_and_respond(server.url, "--count 10", "", "--count 10")
         request_and_respond(server.url, "--count 10 --rate 1000", "", "--count 10")
 
