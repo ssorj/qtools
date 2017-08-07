@@ -56,7 +56,7 @@ def send_and_receive(url, qmessage_args="", qsend_args="", qreceive_args="--coun
 
         raise
 
-    output = receive_proc.communicate()[0]
+    output = receive_proc.communicate()[0].decode()
 
     return output[:-1]
 
@@ -76,7 +76,7 @@ def request_and_respond(url, qmessage_args="", qrequest_args="", qrespond_args="
 
         raise
 
-    output = request_proc.communicate()[0]
+    output = request_proc.communicate()[0].decode()
 
     return output[:-1]
 

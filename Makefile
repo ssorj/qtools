@@ -62,7 +62,7 @@ install: build
 
 .PHONY: test
 test: build
-	qtools-test
+	scripts/run-tests
 
 .PHONY: big-test
 big-test: test test-centos test-fedora test-ubuntu

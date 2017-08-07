@@ -99,12 +99,14 @@ class MessageCommand(_commandant.Command):
         self.message = _proton.Message()
         self.message.id = self.args.id
         self.message.correlation_id = self.args.correlation_id
-        self.message.user_id = self.args.user
         self.message.address = self.args.to
         self.message.reply_to = self.args.reply_to
         self.message.subject = self.args.subject
         self.message.body = self.args.body
         self.message.durable = self.args.durable
+
+        if self.args.user is not None:
+            self.message.user_id = self.args.user.encode()
 
         if self.args.priority is not None:
             try:
@@ -154,6 +156,7 @@ class MessageCommand(_commandant.Command):
                     self.message.body = "message-{:04}".format(count)
 
                 data = convert_message_to_data(self.message)
+
                 _json.dump(data, f)
 
                 f.write("\n")

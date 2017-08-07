@@ -156,7 +156,12 @@ class LinkHandler(_handlers.MessagingHandler):
 
             self.command.info("Connecting to {}", connection_url)
 
-            connection = event.container.connect(connection_url, allowed_mechs=b"ANONYMOUS")
+            allowed_mechs = "ANONYMOUS"
+
+            if _sys.version_info.major == 2:
+                allowed_mechs = b"ANONYMOUS"
+
+            connection = event.container.connect(connection_url, allowed_mechs=allowed_mechs)
             links = self.open_links(event, connection, address)
 
             self.connections.append(connection)
@@ -326,7 +331,7 @@ def process_input_line(line):
         data = _json.loads(line)
         message = convert_data_to_message(data)
     else:
-        line = unicode(line)
+#        line = unicode(line)
         message = _proton.Message(line)
 
     return message
@@ -394,10 +399,13 @@ def convert_message_to_data(message):
 def _set_data_attribute(data, dname, message, mname, omit_if_empty=True):
     value = getattr(message, mname)
 
-    if omit_if_empty and value in (None, ""):
+    if omit_if_empty and value in (None, "", b""):
         return
 
-    data[dname] = getattr(message, mname)
+    if isinstance(value, bytes):
+        value = value.decode()
+
+    data[dname] = value
 
 def unique_id():
     bytes_ = _uuid.uuid4().bytes[:2]

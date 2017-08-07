@@ -79,7 +79,7 @@ class RequestCommand(MessagingCommand):
 
         if self.args.message:
             for value in self.args.message:
-                self.input_thread.push_line(unicode(value))
+                self.input_thread.push_line(value)
 
             self.input_thread.push_line(DONE)
 
