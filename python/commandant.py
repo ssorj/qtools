@@ -222,6 +222,7 @@ class TestCommand(Command):
             return
 
         print("RESULT: Some tests failed")
+        _sys.exit(1)
 
 class _TestSession(object):
     def __init__(self, module):
