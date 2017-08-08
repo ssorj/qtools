@@ -82,6 +82,11 @@ test-ubuntu:
 	sudo docker build -f scripts/test-ubuntu.dockerfile -t ${USER}/qtools-test-ubuntu --build-arg CACHE_BUST=$${RANDOM} .
 	sudo docker run ${USER}/qtools-test-ubuntu
 
+.PHONY: test-ubuntu-trusty
+test-ubuntu-trusty:
+	sudo docker build -f scripts/test-ubuntu-trusty.dockerfile -t ${USER}/qtools-test-ubuntu-trusty --build-arg CACHE_BUST=$${RANDOM} .
+	sudo docker run ${USER}/qtools-test-ubuntu-trusty
+
 build/prefix.txt:
 	echo ${PREFIX} > build/prefix.txt
 

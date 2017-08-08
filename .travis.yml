@@ -2,13 +2,16 @@ sudo: enabled
 dist: trusty
 language: python
 
+virtualenv:
+ system_site_packages: true
+
 services:
  - docker
 
 before_install:
-  - sudo add-apt-repository -y ppa:qpid/released
-  - sudo apt-get -qq update
-  - sudo apt-get -y install make python-qpid-proton
+ - sudo add-apt-repository -y ppa:qpid/released
+ - sudo apt-get -qq update
+ - sudo apt-get -y install make python-qpid-proton
 
 script:
  - make big-test
