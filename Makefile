@@ -23,6 +23,8 @@ DESTDIR := ""
 PREFIX := /usr/local
 INSTALLED_QTOOLS_HOME = ${PREFIX}/lib/qtools
 
+VIRTUALENV_ENABLED := 1
+
 export QTOOLS_HOME = ${PWD}/build/qtools
 export PATH := ${PWD}/build/bin:${PATH}
 export PYTHONPATH := ${QTOOLS_HOME}/python:${PWD}/python:${PYTHONPATH}
@@ -62,7 +64,7 @@ install: build
 
 .PHONY: test
 test: build
-	scripts/run-tests
+	scripts/run-tests ${VIRTUALENV_ENABLED}
 
 .PHONY: big-test
 big-test: test test-centos test-fedora test-ubuntu

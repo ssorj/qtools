@@ -6,11 +6,10 @@ services:
  - docker
 
 python:
- - "2.7"
  - "3.4"
 
 install:
  - pip install python-qpid-proton
 
 script:
- - make big-test
+ - make big-test VIRTUALENV_ENABLED=0
