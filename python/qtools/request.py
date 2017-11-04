@@ -97,6 +97,9 @@ class _Handler(LinkHandler):
         self.receivers_by_sender = dict()
         self.senders_by_receiver = dict()
 
+        self.current_message_id = 0
+        self.pending_ids = set()
+
         self.sent_requests = 0
         self.received_responses = 0
 
@@ -159,7 +162,11 @@ class _Handler(LinkHandler):
             message.address = sender.target.address
 
         if message.id is None:
-            message.id = unique_id()
+            self.current_message_id += 1
+
+            message.id = self.current_message_id
+
+        self.pending_ids.add(message.id)
 
         delivery = sender.send(message)
 
@@ -176,6 +183,9 @@ class _Handler(LinkHandler):
             return
 
         message = event.message
+
+        assert message.correlation_id in self.pending_ids, (message.correlation_id, self.pending_ids)
+        # XXX remove id from pending_ids?
 
         self.received_responses += 1
 
