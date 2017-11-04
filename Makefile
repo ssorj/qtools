@@ -74,6 +74,11 @@ test-centos:
 	sudo docker build -f scripts/test-centos.dockerfile -t ${USER}/qtools-test-centos --build-arg CACHE_BUST=$${RANDOM} .
 	sudo docker run ${USER}/qtools-test-centos
 
+.PHONY: test-centos-6
+test-centos-6:
+	sudo docker build -f scripts/test-centos-6.dockerfile -t ${USER}/qtools-test-centos-6 --build-arg CACHE_BUST=$${RANDOM} .
+	sudo docker run ${USER}/qtools-test-centos-6
+
 .PHONY: test-fedora
 test-fedora:
 	sudo docker build -f scripts/test-fedora.dockerfile -t ${USER}/qtools-test-fedora --build-arg CACHE_BUST=$${RANDOM} .
