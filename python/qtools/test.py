@@ -93,7 +93,7 @@ class TestServer(object):
     def __exit__(self, exc_type, exc_value, traceback):
         stop_process(self.proc)
 
-def test_send_receive(session):
+def test_send_and_receive(session):
     with TestServer() as server:
         body = send_and_receive(server.url, "--body abc123", "", "--count 1 --no-prefix")
         assert body == "abc123", body
@@ -103,7 +103,7 @@ def test_send_receive(session):
         send_and_receive(server.url, "--count 10", "", "--count 10")
         send_and_receive(server.url, "--count 10 --rate 1000", "", "--count 10")
 
-def test_request_respond(session):
+def test_request_and_respond(session):
     with TestServer() as server:
         body = request_and_respond(server.url, "--body abc123", "--no-prefix", "--count 1 --reverse --upper --append ' and this'")
         assert body == "321CBA and this", body
