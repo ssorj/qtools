@@ -144,7 +144,7 @@ class _Handler(LinkHandler):
 
         self.sent_messages += 1
 
-        self.command.info("Sent {} as {} to {} on {}",
+        self.command.info("Sent {0} as {1} to {2} on {3}",
                           message,
                           delivery,
                           sender.target,
@@ -161,6 +161,6 @@ class _Handler(LinkHandler):
     def close(self, event):
         super(_Handler, self).close(event)
 
-        self.command.notice("Sent {} {}",
+        self.command.notice("Sent {0} {1}",
                             self.sent_messages,
                             plural("message", self.sent_messages))

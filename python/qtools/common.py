@@ -85,7 +85,7 @@ class MessagingCommand(_commandant.Command):
         self.id = self.args.id
 
         if self.id is None:
-            self.id = "{}-{}".format(self.name, unique_id())
+            self.id = "{0}-{1}".format(self.name, unique_id())
 
         self.container.container_id = self.id
 
@@ -152,13 +152,13 @@ class LinkHandler(_handlers.MessagingHandler):
     def on_start(self, event):
         for url in self.command.urls:
             scheme, host, port, address = self.command.parse_address_url(url)
-            connection_url = "{}://{}:{}".format(scheme, host, port)
+            connection_url = "{0}://{1}:{2}".format(scheme, host, port)
 
-            self.command.info("Connecting to {}", connection_url)
+            self.command.info("Connecting to {0}", connection_url)
 
             allowed_mechs = "ANONYMOUS"
 
-            if _sys.version_info.major == 2:
+            if _sys.version_info[0] == 2:
                 allowed_mechs = b"ANONYMOUS"
 
             connection = event.container.connect(connection_url, allowed_mechs=allowed_mechs)
@@ -173,7 +173,7 @@ class LinkHandler(_handlers.MessagingHandler):
     def on_connection_opened(self, event):
         assert event.connection in self.connections
 
-        self.command.info("Connected to {}", event.connection)
+        self.command.info("Connected to {0}", event.connection)
 
     def on_link_opened(self, event):
         assert event.link in self.links
@@ -181,12 +181,12 @@ class LinkHandler(_handlers.MessagingHandler):
         self.opened_links += 1
 
         if event.link.is_receiver:
-            self.command.notice("Created receiver for {} on {}",
+            self.command.notice("Created receiver for {0} on {1}",
                                 event.link.source,
                                 event.connection)
 
         if event.link.is_sender:
-            self.command.notice("Created sender for {} on {}",
+            self.command.notice("Created sender for {0} on {1}",
                                 event.link.target,
                                 event.connection)
 
@@ -196,7 +196,7 @@ class LinkHandler(_handlers.MessagingHandler):
     def on_settled(self, event):
         delivery = event.delivery
 
-        template = "{} {{}} {} to {}"
+        template = "{0} {{0}} {1} to {2}"
         template = template.format(_summarize(event.connection),
                                    _summarize(delivery),
                                    _summarize(event.link.target))
@@ -288,7 +288,7 @@ def _summarize(entity):
     return entity
 
 def _summarize_connection(connection):
-    return "container '{}'".format(connection.remote_container)
+    return "container '{0}'".format(connection.remote_container)
 
 def _summarize_terminus(terminus):
     if terminus.type == terminus.SOURCE:
@@ -300,14 +300,14 @@ def _summarize_terminus(terminus):
 
     if terminus.address is None:
         if terminus.dynamic:
-            return "dynamic {}".format(type_)
+            return "dynamic {0}".format(type_)
 
-        return "null {}".format(type_)
+        return "null {0}".format(type_)
 
-    return "{} '{}'".format(type_, terminus.address)
+    return "{0} '{1}'".format(type_, terminus.address)
 
 def _summarize_delivery(delivery):
-    return "delivery '{}'".format(delivery.tag)
+    return "delivery '{0}'".format(delivery.tag)
 
 def _summarize_message(message):
     desc = message.body
@@ -319,9 +319,9 @@ def _summarize_message(message):
         return "message"
 
     if len(desc) > 16:
-        desc = "{}...".format(desc[:12])
+        desc = "{0}...".format(desc[:12])
 
-    return "message '{}'".format(desc)
+    return "message '{0}'".format(desc)
 
 def process_input_line(line):
     if line.endswith("\n"):

@@ -26,19 +26,19 @@ def open_test_session(session):
     set_message_threshold("error")
 
 def start_qmessage(args, **kwargs):
-    return start_process("qmessage --verbose {}", args, **kwargs)
+    return start_process("qmessage --verbose {0}", args, **kwargs)
 
 def start_qsend(url, args, **kwargs):
-    return start_process("qsend --verbose {} {}", url, args, **kwargs)
+    return start_process("qsend --verbose {0} {1}", url, args, **kwargs)
 
 def start_qreceive(url, args, **kwargs):
-    return start_process("qreceive --verbose {} {}", url, args, **kwargs)
+    return start_process("qreceive --verbose {0} {1}", url, args, **kwargs)
 
 def start_qrequest(url, args, **kwargs):
-    return start_process("qrequest --verbose {} {}", url, args, **kwargs)
+    return start_process("qrequest --verbose {0} {1}", url, args, **kwargs)
 
 def start_qrespond(url, args, **kwargs):
-    return start_process("qrespond --verbose {} {}", url, args, **kwargs)
+    return start_process("qrespond --verbose {0} {1}", url, args, **kwargs)
 
 def send_and_receive(url, qmessage_args="", qsend_args="", qreceive_args="--count 1"):
     message_proc = start_qmessage(qmessage_args, stdout=PIPE)
@@ -84,8 +84,8 @@ class TestServer(object):
     def __init__(self):
         port = random_port()
 
-        self.proc = start_process("qbroker --quiet --port {}", port)
-        self.proc.url = "//127.0.0.1:{}/q0".format(port)
+        self.proc = start_process("qbroker --quiet --port {0}", port)
+        self.proc.url = "//127.0.0.1:{0}/q0".format(port)
 
     def __enter__(self):
         return self.proc

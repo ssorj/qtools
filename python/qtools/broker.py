@@ -59,10 +59,10 @@ class _Queue(object):
         self.messages = _collections.deque()
         self.consumers = list()
 
-        self.command.info("Created {}", self)
+        self.command.info("Created {0}", self)
 
     def __repr__(self):
-        return "queue '{}'".format(self.address)
+        return "queue '{0}'".format(self.address)
 
     def add_consumer(self, link):
         assert link.is_sender
@@ -70,7 +70,7 @@ class _Queue(object):
 
         self.consumers.append(link)
 
-        self.command.info("Added consumer for {} to {}", link.connection, self)
+        self.command.info("Added consumer for {0} to {1}", link.connection, self)
 
     def remove_consumer(self, link):
         assert link.is_sender
@@ -80,12 +80,12 @@ class _Queue(object):
         except ValueError:
             return
 
-        self.command.info("Removed consumer for {} from {}", link.connection, self)
+        self.command.info("Removed consumer for {0} from {1}", link.connection, self)
 
     def store_message(self, delivery, message):
         self.messages.append(message)
 
-        self.command.notice("Stored {} from {} on {}", message, delivery.connection, self)
+        self.command.notice("Stored {0} from {1} on {2}", message, delivery.connection, self)
 
     def forward_messages(self, link):
         assert link.is_sender
@@ -98,7 +98,7 @@ class _Queue(object):
 
             link.send(message)
 
-            self.command.notice("Forwarded {} on {} to {}", message, self, link.connection)
+            self.command.notice("Forwarded {0} on {1} to {2}", message, self, link.connection)
 
 class _Handler(_handlers.MessagingHandler):
     def __init__(self, command):
@@ -109,11 +109,11 @@ class _Handler(_handlers.MessagingHandler):
         self.verbose = False
 
     def on_start(self, event):
-        interface = "{}:{}".format(self.command.host, self.command.port)
+        interface = "{0}:{1}".format(self.command.host, self.command.port)
 
         self.acceptor = event.container.listen(interface)
 
-        self.command.notice("Listening on '{}'", interface)
+        self.command.notice("Listening on '{0}'", interface)
 
     def get_queue(self, address):
         try:
@@ -151,16 +151,16 @@ class _Handler(_handlers.MessagingHandler):
         event.connection.container = event.container.container_id
 
     def on_connection_opened(self, event):
-        self.command.notice("Opened connection from {}", event.connection)
+        self.command.notice("Opened connection from {0}", event.connection)
 
     def on_connection_closing(self, event):
         self.remove_consumers(event.connection)
 
     def on_connection_closed(self, event):
-        self.command.notice("Closed connection from {}", event.connection)
+        self.command.notice("Closed connection from {0}", event.connection)
 
     def on_disconnected(self, event):
-        self.command.notice("Disconnected from {}", event.connection)
+        self.command.notice("Disconnected from {0}", event.connection)
 
         self.remove_consumers(event.connection)
 
@@ -181,7 +181,7 @@ class _Handler(_handlers.MessagingHandler):
     def on_settled(self, event):
         delivery = event.delivery
 
-        template = "{} {{}} {} to {}"
+        template = "{0} {{0}} {1} to {2}"
         template = template.format(_summarize(event.connection),
                                    _summarize(delivery),
                                    _summarize(event.link.source))

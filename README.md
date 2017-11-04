@@ -22,6 +22,7 @@ For more ways to build and use Docker images and packages, see
  - make
  - python-qpid-proton
  - python3-qpid-proton
+ - python-argparse (required only on RHEL 6)
 
 ### Using Docker
 

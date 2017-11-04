@@ -131,11 +131,11 @@ class Command(object):
             self.print_message(message, *args)
 
     def warn(self, message, *args):
-        message = "Warning! {}".format(message)
+        message = "Warning! {0}".format(message)
         self.print_message(message, *args)
 
     def error(self, message, *args):
-        message = "Error! {}".format(message)
+        message = "Error! {0}".format(message)
         self.print_message(message, *args)
 
     def fail(self, message, *args):
@@ -145,9 +145,9 @@ class Command(object):
     def print_message(self, message, *args):
         message = message[0].upper() + message[1:]
         message = message.format(*args)
-        message = "{}: {}".format(self.id, message)
+        message = "{0}: {1}".format(self.id, message)
 
-        _sys.stderr.write("{}\n".format(message))
+        _sys.stderr.write("{0}\n".format(message))
         _sys.stderr.flush()
 
 class TestTimedOut(Exception):
@@ -243,7 +243,7 @@ class _TestFunction(object):
         return self.function(session)
 
     def __repr__(self):
-        return "test '{}:{}'".format(self.module.name, self.name)
+        return "test '{0}:{1}'".format(self.module.name, self.name)
 
     @property
     def name(self):
@@ -263,7 +263,7 @@ class _TestModule(object):
         self.command.test_modules.append(self)
 
     def __repr__(self):
-        return "module '{}'".format(self.name)
+        return "module '{0}'".format(self.name)
 
     @property
     def name(self):
@@ -301,11 +301,11 @@ class _TestModule(object):
                 continue
 
             if not included(name):
-                self.command.info("Skipping test '{}:{}' (not included)", self.module.__name__, name)
+                self.command.info("Skipping test '{0}:{1}' (not included)", self.module.__name__, name)
                 continue
 
             if excluded(name):
-                self.command.info("Skipping test '{}:{}' (excluded)", self.module.__name__, name)
+                self.command.info("Skipping test '{0}:{1}' (excluded)", self.module.__name__, name)
                 continue
 
             _TestFunction(self, function)
@@ -318,7 +318,7 @@ class _TestModule(object):
             return
 
         if not self.command.verbose:
-            self.command.notice("Running tests from {}", self)
+            self.command.notice("Running tests from {0}", self)
 
         if self.open_function is not None:
             self.open_function(session)
@@ -334,7 +334,7 @@ class _TestModule(object):
         start_time = _time.time()
 
         if self.command.verbose:
-            self.command.notice("Running {}", function)
+            self.command.notice("Running {0}", function)
 
             try:
                 with _Timer(self.command.test_timeout):
@@ -346,14 +346,14 @@ class _TestModule(object):
 
                 _traceback.print_exc()
 
-                self.command.error("{} FAILED ({})", function, _elapsed_time(start_time))
+                self.command.error("{0} FAILED ({1})", function, _elapsed_time(start_time))
 
                 return
 
             session.passed_tests.append(function)
-            self.command.notice("{} PASSED ({})", function, _elapsed_time(start_time))
+            self.command.notice("{0} PASSED ({1})", function, _elapsed_time(start_time))
         else:
-            self._print("{:.<73} ".format(function.name + " "), end="")
+            self._print("{0:.<73} ".format(function.name + " "), end="")
 
             output_file = _tempfile.mkstemp(prefix="commandant-")[1]
 
@@ -369,7 +369,7 @@ class _TestModule(object):
 
                 _traceback.print_exc()
 
-                self._print("FAILED {:>6}".format(_elapsed_time(start_time)))
+                self._print("FAILED {0:>6}".format(_elapsed_time(start_time)))
 
                 with open(output_file, "r") as out:
                     for line in out:
@@ -383,7 +383,7 @@ class _TestModule(object):
                 _os.remove(output_file)
 
             session.passed_tests.append(function)
-            self._print("PASSED {:>6}".format(_elapsed_time(start_time)))
+            self._print("PASSED {0:>6}".format(_elapsed_time(start_time)))
 
     def _print(self, *args, **kwargs):
         if self.command.quiet:
@@ -397,12 +397,12 @@ def _elapsed_time(start_time):
     elapsed = _time.time() - start_time
 
     if elapsed > 240:
-        return "{:.0f}m".format(elapsed / 60)
+        return "{0:.0f}m".format(elapsed / 60)
 
     if elapsed > 60:
-        return "{:.0f}s".format(elapsed)
+        return "{0:.0f}s".format(elapsed)
 
-    return "{:.1f}s".format(elapsed)
+    return "{0:.1f}s".format(elapsed)
 
 class _OutputRedirected(object):
     def __init__(self, stdout=None, stderr=None):

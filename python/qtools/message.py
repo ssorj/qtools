@@ -150,10 +150,10 @@ class MessageCommand(_commandant.Command):
                 start_time = _time.time()
 
                 if self.generate_message_id:
-                    self.message.id = "{}-{:04}".format(self.id_prefix, count)
+                    self.message.id = "{0}-{1:04}".format(self.id_prefix, count)
 
                 if self.generate_message_body:
-                    self.message.body = "message-{:04}".format(count)
+                    self.message.body = "message-{0:04}".format(count)
 
                 data = convert_message_to_data(self.message)
 

@@ -172,7 +172,7 @@ class _Handler(LinkHandler):
 
         self.sent_requests += 1
 
-        self.command.info("Sent request {} as {} to {} on {}",
+        self.command.info("Sent request {0} as {1} to {2} on {3}",
                           message,
                           delivery,
                           sender.target,
@@ -205,7 +205,7 @@ class _Handler(LinkHandler):
 
         self.command.output_thread.push_line("".join(out))
 
-        self.command.info("Received response {} from {} on {}",
+        self.command.info("Received response {0} from {1} on {2}",
                           event.message,
                           event.link.source,
                           event.connection)
@@ -218,7 +218,7 @@ class _Handler(LinkHandler):
     def close(self, event):
         super(_Handler, self).close(event)
 
-        self.command.notice("Sent {} {} and received {} {}",
+        self.command.notice("Sent {0} {1} and received {2} {3}",
                             self.sent_requests,
                             plural("request", self.sent_requests),
                             self.received_responses,

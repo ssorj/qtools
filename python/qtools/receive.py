@@ -104,25 +104,25 @@ class _Handler(LinkHandler):
             if message.instructions is not None:
                 for name in sorted(message.instructions):
                     value = message.instructions[name]
-                    self.write_line("[delivery annotation] {}: {}", name, value)
+                    self.write_line("[delivery annotation] {0}: {1}", name, value)
 
             if message.annotations is not None:
                 for name in sorted(message.annotations):
                     value = message.annotations[name]
-                    self.write_line("[message annotation] {}: {}", name, value)
+                    self.write_line("[message annotation] {0}: {1}", name, value)
 
         if self.command.properties_enabled:
             if message.properties is not None:
                 for name in sorted(message.properties):
                     value = message.properties[name]
-                    self.write_line("[property] {}: {}", name, value)
+                    self.write_line("[property] {0}: {1}", name, value)
 
         if self.command.router_trace_enabled:
             value = message.annotations.get("x-opt-qd.trace")
             value = ", ".join(value)
 
             if value is not None:
-                self.write_line("[router trace] {}", value)
+                self.write_line("[router trace] {0}", value)
 
         out = list()
 
@@ -139,7 +139,7 @@ class _Handler(LinkHandler):
 
         self.write_line("".join(out))
 
-        self.command.info("Received {} from {} on {}",
+        self.command.info("Received {0} from {1} on {2}",
                           message,
                           event.link.source,
                           event.connection)
@@ -152,7 +152,7 @@ class _Handler(LinkHandler):
     def close(self, event):
         super(_Handler, self).close(event)
 
-        self.command.notice("Received {} {}",
+        self.command.notice("Received {0} {1}",
                             self.received_messages,
                             plural("message", self.received_messages))
 

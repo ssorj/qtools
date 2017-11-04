@@ -83,12 +83,12 @@ class RespondCommand(MessagingCommand):
             try:
                 config = _runpy.run_path(config_file)
             except:
-                self.fail("Failed to load config from '{}'", config_file)
+                self.fail("Failed to load config from '{0}'", config_file)
 
             try:
                 self.process = config["process"]
             except KeyError:
-                self.fail("Function 'process' not found in '{}'", config_file)
+                self.fail("Function 'process' not found in '{0}'", config_file)
 
         self.max_count = self.args.count
         self.upper = self.args.upper
@@ -138,7 +138,7 @@ class _Handler(LinkHandler):
         request = event.message
         receiver = event.link
 
-        self.command.info("Received request {} from {} on {}",
+        self.command.info("Received request {0} from {1} on {2}",
                           request,
                           receiver.source,
                           event.connection)
@@ -160,14 +160,14 @@ class _Handler(LinkHandler):
             sender = self.senders_by_receiver[event.link]
             sender.send(response)
 
-            self.command.info("Sent response {} to {} on {}",
+            self.command.info("Sent response {0} to {1} on {2}",
                               response,
                               sender.target,
                               event.connection)
 
             self.accept(delivery)
         else:
-            self.command.warn("Processing request {} failed", request)
+            self.command.warn("Processing request {0} failed", request)
 
             self.reject(delivery)
 
@@ -178,6 +178,6 @@ class _Handler(LinkHandler):
     def close(self, event):
         super(_Handler, self).close(event)
 
-        self.command.notice("Processed {} {}",
+        self.command.notice("Processed {0} {1}",
                             self.processed_requests,
                             plural("request", self.processed_requests))
