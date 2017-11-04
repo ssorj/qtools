@@ -143,8 +143,8 @@ class _Handler(_handlers.MessagingHandler):
 
     def on_link_closing(self, event):
         if event.link.is_sender:
-            queue = self.queues[link.source.address]
-            queue.remove_consumer(link)
+            queue = self.queues[event.link.source.address]
+            queue.remove_consumer(event.link)
 
     def on_connection_opening(self, event):
         # XXX I think this should happen automatically
