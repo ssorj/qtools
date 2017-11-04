@@ -2,14 +2,14 @@
 
 [![Build Status](https://travis-ci.org/ssorj/qtools.svg?branch=master)](https://travis-ci.org/ssorj/qtools)
 
-    $ qreceive amqp://amqp.zone/queue1 --count 1 &
-    $ qsend amqp://amqp.zone/queue1 --message hello
+    $ qreceive amqp://example.net/queue1 --count 1 &
+    $ qsend amqp://example.net/queue1 --message hello
 
-    $ qrespond amqp://amqp.zone/requests &
-    $ qrequest amqp://amqp.zone/requests < requests.txt
+    $ qrespond amqp://example.net/requests &
+    $ qrequest amqp://example.net/requests < requests.txt
 
-    $ qmessage --count 10 | qsend amqp://amqp.zone/queue1
-    $ qmessage --rate 1 | qrequest amqp://amqp.zone/requests
+    $ qmessage --count 10 | qsend amqp://example.net/queue1
+    $ qmessage --rate 1 | qrequest amqp://example.net/requests
 
 ## Installation
 
@@ -76,8 +76,8 @@ of a message source or target, such as a queue or topic.
     qsend ADDRESS-URL [ADDRESS-URL ...]
 
 An address URL has optional scheme and server parts.  The default
-scheme is 'amqp' and 'server' is '127.0.0.1:5672'.  You can use the
-`--server` option to change the default server.
+scheme is 'amqp', and the default 'server' is '127.0.0.1:5672'.  You
+can use the `--server` option to change the default server.
 
     [SCHEME:][//SERVER/]ADDRESS
 
@@ -120,8 +120,8 @@ output.
 
 Typical usage:
 
-    $ qsend //amqp.zone/queue1 --message m1 &
-    $ qreceive //amqp.zone/queue1
+    $ qsend amqp://example.net/queue1 --message m1 &
+    $ qreceive amqp://example.net/queue1
     queue1: m1
 
 ### The `qrequest` and `qrespond` commands
@@ -143,8 +143,8 @@ writes responses to standard output.
 
 Typical usage:
 
-    $ qrespond //amqp.zone/jobs --upper &
-    $ qrequest //amqp.zone/jobs --message abc
+    $ qrespond amqp://example.net/jobs --upper &
+    $ qrequest amqp://example.net/jobs --message abc
     ABC
 
 ### The `qmessage` command
@@ -166,7 +166,7 @@ The output is in JSON format.  The send and request tools can consume
 it.  Usually you pipe it in, like this.
 
     $ qmessage | qsend queue1
-    $ qmessage --rate 1 | qrequest //amqp.zone/jobs
+    $ qmessage --rate 1 | qrequest amqp://example.net/jobs
 
 ### The `qbroker` command
 
