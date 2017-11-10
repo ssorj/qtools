@@ -185,7 +185,7 @@ class LinkHandler(_handlers.MessagingHandler):
                                 event.link.source,
                                 event.connection)
 
-        if event.link.is_sender:
+        if event.link.is_sender and event.link.target.address is not None:
             self.command.notice("Created sender for {0} on {1}",
                                 event.link.target,
                                 event.connection)
@@ -196,10 +196,9 @@ class LinkHandler(_handlers.MessagingHandler):
     def on_settled(self, event):
         delivery = event.delivery
 
-        template = "{0} {{0}} {1} to {2}"
+        template = "{0} {{0}} {1}"
         template = template.format(_summarize(event.connection),
-                                   _summarize(delivery),
-                                   _summarize(event.link.target))
+                                   _summarize(delivery))
 
         if delivery.remote_state == delivery.ACCEPTED:
             self.command.info(template, "accepted")

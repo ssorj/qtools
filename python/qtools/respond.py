@@ -160,9 +160,9 @@ class _Handler(LinkHandler):
             sender = self.senders_by_receiver[event.link]
             sender.send(response)
 
-            self.command.info("Sent response {0} to {1} on {2}",
+            self.command.info("Sent response {0} to address '{1}' on {2}",
                               response,
-                              sender.target,
+                              response.address,
                               event.connection)
 
             self.accept(delivery)
