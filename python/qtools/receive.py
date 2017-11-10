@@ -137,7 +137,7 @@ class _Handler(LinkHandler):
         else:
             out.append(message.body)
 
-        self.write_line("".join(out))
+        self.command.output_thread.push_line("".join(out))
 
         self.command.info("Received {0} from {1} on {2}",
                           message,
