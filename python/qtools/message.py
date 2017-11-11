@@ -34,11 +34,18 @@ from .common import *
 
 _description = "Generate AMQP messages"
 
+_epilog = """
+example usage:
+  $ qmessage --body abc --property color red | qsend amqp://example.net/queue1
+  $ qmessage --count 10 --rate 1 | qrequest amqp://example.net/requests
+"""
+
 class MessageCommand(_commandant.Command):
     def __init__(self, home_dir):
         super(MessageCommand, self).__init__(home_dir, "qmessage")
 
         self.description = _description
+        self.epilog = _epilog
 
         self.add_argument("--output", metavar="FILE",
                           help="Write messages to FILE (default stdout)")
