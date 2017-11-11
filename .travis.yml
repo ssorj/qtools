@@ -6,7 +6,7 @@ services:
  - docker
 
 python:
- - "3.4"
+ - "2.7"
 
 install:
  - pip install python-qpid-proton
