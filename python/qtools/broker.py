@@ -41,9 +41,9 @@ class BrokerCommand(MessagingCommand):
         self.description = _description
 
         self.add_argument("--host", metavar="HOST", default="127.0.0.1",
-                          help="Listen on HOST (default 127.0.0.1)")
+                          help="Listen for connections on HOST (default 127.0.0.1)")
         self.add_argument("--port", metavar="PORT", default=5672,
-                          help="Listen on PORT (default 5672)")
+                          help="Listen for connections on PORT (default 5672)")
 
     def init(self):
         super(BrokerCommand, self).init()
@@ -113,7 +113,7 @@ class _Handler(_handlers.MessagingHandler):
 
         self.acceptor = event.container.listen(interface)
 
-        self.command.notice("Listening on '{0}'", interface)
+        self.command.notice("Listening for connections on '{0}'", interface)
 
     def get_queue(self, address):
         try:
