@@ -21,7 +21,7 @@
 
 DESTDIR := ""
 PREFIX := /usr/local
-INSTALLED_QTOOLS_HOME = ${PREFIX}/lib/qtools
+INSTALLED_QTOOLS_HOME = ${PREFIX}/share/qtools
 
 VIRTUALENV_ENABLED := 1
 
@@ -60,7 +60,7 @@ build: ${BIN_TARGETS} ${PYTHON_TARGETS} build/prefix.txt
 .PHONY: install
 install: build
 	scripts/install-files build/bin ${DESTDIR}$$(cat build/prefix.txt)/bin
-	scripts/install-files build/qtools ${DESTDIR}$$(cat build/prefix.txt)/lib/qtools
+	scripts/install-files build/qtools ${DESTDIR}$$(cat build/prefix.txt)/share/qtools
 
 .PHONY: test
 test: build
