@@ -57,7 +57,7 @@ class _Queue(object):
         self.address = address
 
         self.messages = _collections.deque()
-        self.consumers = list()
+        self.consumers = _collections.deque()
 
         self.command.info("Created {0}", self)
 
@@ -99,6 +99,31 @@ class _Queue(object):
             link.send(message)
 
             self.command.notice("Forwarded {0} on {1} to {2}", message, self, link.connection)
+
+    def forward_messages(self):
+        credit = sum([x.credit for x in self.consumers])
+        sent = 0
+
+        if credit == 0:
+            return
+
+        while sent < credit:
+            for consumer in self.consumers:
+                if consumer.credit == 0:
+                    continue
+
+                try:
+                    message = self.messages.popleft()
+                except IndexError:
+                    self.consumers.rotate(sent)
+                    return
+
+                consumer.send(message)
+                sent += 1
+
+                self.command.notice("Forwarded {0} on {1} to {2}", message, self, consumer.connection)
+
+        self.consumers.rotate(sent)
 
 class _Handler(_handlers.MessagingHandler):
     def __init__(self, command):
@@ -176,7 +201,7 @@ class _Handler(_handlers.MessagingHandler):
 
     def on_sendable(self, event):
         queue = self.get_queue(event.link.source.address)
-        queue.forward_messages(event.link)
+        queue.forward_messages()
 
     def on_settled(self, event):
         delivery = event.delivery
@@ -205,6 +230,4 @@ class _Handler(_handlers.MessagingHandler):
 
         queue = self.get_queue(address)
         queue.store_message(delivery, message)
-
-        for link in queue.consumers:
-            queue.forward_messages(link)
+        queue.forward_messages()
