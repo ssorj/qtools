@@ -90,7 +90,7 @@ class RespondCommand(MessagingCommand):
             except KeyError:
                 self.fail("Function 'process' not found in '{0}'", config_file)
 
-        self.max_count = self.args.count
+        self.desired_messages = self.args.count
         self.upper = self.args.upper
         self.reverse = self.args.reverse
         self.append = self.args.append
@@ -131,9 +131,6 @@ class _Handler(LinkHandler):
         return receiver, sender
 
     def on_message(self, event):
-        if self.done_receiving:
-            return
-
         delivery = event.delivery
         request = event.message
         receiver = event.link
@@ -171,8 +168,7 @@ class _Handler(LinkHandler):
 
             self.reject(delivery)
 
-        if self.processed_requests == self.command.max_count:
-            self.done_receiving = True
+        if self.processed_requests == self.command.desired_messages:
             self.close(event)
 
     def close(self, event):

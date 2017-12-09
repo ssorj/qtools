@@ -78,6 +78,12 @@ class MessagingCommand(_commandant.Command):
                           help="Use HOST[:PORT] as the default server (default 127.0.0.1:5672)")
         self.add_argument("--tls", action="store_true",
                           help="Connect using SSL/TLS authentication and encryption")
+        self.add_argument("--user", metavar="USER",
+                          help="Identify as USER")
+        self.add_argument("--password", metavar="SECRET",
+                          help="Prove your identity with SECRET")
+        self.add_argument("--allowed-mechs", metavar="MECHS", default="anonymous,plain",
+                          help="Restrict allowed SASL mechanisms to MECHS (default \"anonymous,plain\")")
 
     def init(self):
         super(MessagingCommand, self).init()
@@ -90,9 +96,12 @@ class MessagingCommand(_commandant.Command):
         self.container.container_id = self.id
 
     def init_link_attributes(self):
+        self.urls = self.args.url
         self.server = self.args.server
         self.tls_enabled = self.args.tls
-        self.urls = self.args.url
+        self.user = self.args.user
+        self.password = self.args.password
+        self.allowed_mechs = self.args.allowed_mechs.replace(",", " ").upper()
 
     def parse_address_url(self, address):
         url = _urlparse(address)
@@ -145,9 +154,7 @@ class LinkHandler(_handlers.MessagingHandler):
         self.links = list()
 
         self.opened_links = 0
-
         self.done_sending = False
-        self.done_receiving = False
 
     def on_start(self, event):
         for url in self.command.urls:
@@ -156,12 +163,13 @@ class LinkHandler(_handlers.MessagingHandler):
 
             self.command.info("Connecting to {0}", connection_url)
 
-            allowed_mechs = "ANONYMOUS"
+            allowed_mechs = self.command.allowed_mechs.encode("utf-8")
 
-            if _sys.version_info[0] == 2:
-                allowed_mechs = b"ANONYMOUS"
+            connection = event.container.connect(connection_url,
+                                                 user=self.command.user,
+                                                 password=self.command.password,
+                                                 allowed_mechs=allowed_mechs)
 
-            connection = event.container.connect(connection_url, allowed_mechs=allowed_mechs)
             links = self.open_links(event, connection, address)
 
             self.connections.append(connection)
@@ -209,7 +217,14 @@ class LinkHandler(_handlers.MessagingHandler):
         elif delivery.remote_state == delivery.MODIFIED:
             self.command.notice(template, "modified")
 
+    def on_transport_error(self, event):
+        cond = event.transport.condition
+        self.command.error("{0}: {1}", cond.name, cond.description)
+
     def close(self, event):
+        for link in self.links:
+            link.close()
+
         for connection in self.connections:
             connection.close()
 

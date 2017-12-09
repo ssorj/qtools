@@ -73,7 +73,7 @@ class ReceiveCommand(MessagingCommand):
         self.properties_enabled = self.args.properties
         self.router_trace_enabled = self.args.router_trace
         self.prefix_disabled = self.args.no_prefix
-        self.max_count = self.args.count
+        self.desired_messages = self.args.count
 
         if self.args.output is not None:
             self.output_file = open(self.args.output, "w")
@@ -92,9 +92,6 @@ class _Handler(LinkHandler):
         return event.container.create_receiver(connection, address),
 
     def on_message(self, event):
-        if self.done_receiving:
-            return
-
         self.received_messages += 1
 
         message = event.message
@@ -144,9 +141,8 @@ class _Handler(LinkHandler):
                           event.link.source,
                           event.connection)
 
-        if self.received_messages == self.command.max_count:
+        if self.received_messages == self.command.desired_messages:
             self.command.output_thread.push_line(DONE)
-            self.done_receiving = True
             self.close(event)
 
     def close(self, event):

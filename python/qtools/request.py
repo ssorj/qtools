@@ -179,9 +179,6 @@ class _Handler(LinkHandler):
                           sender.connection)
 
     def on_message(self, event):
-        if self.done_receiving:
-            return
-
         message = event.message
 
         assert message.correlation_id in self.pending_ids, (message.correlation_id, self.pending_ids)
@@ -212,7 +209,6 @@ class _Handler(LinkHandler):
 
         if self.done_sending and self.sent_requests == self.received_responses:
             self.command.output_thread.push_line(DONE)
-            self.done_receiving = True
             self.close(event)
 
     def close(self, event):

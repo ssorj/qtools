@@ -84,7 +84,7 @@ class TestServer(object):
     def __init__(self):
         port = random_port()
 
-        self.proc = start_process("qbroker --quiet --port {0}", port)
+        self.proc = start_process("qbroker --verbose --port {0}", port)
         self.proc.url = "//127.0.0.1:{0}/q0".format(port)
 
     def __enter__(self):
@@ -102,6 +102,7 @@ def test_send_and_receive(session):
         send_and_receive(server.url, "", "-m abc --message xyz", "--count 2")
         send_and_receive(server.url, "--count 10", "", "--count 10")
         send_and_receive(server.url, "--count 10 --rate 1000", "", "--count 10")
+        send_and_receive(server.url, "", "--allowed-mechs anonymous --user harry", "--allowed-mechs anonymous --user sally --count 1")
 
 def test_request_and_respond(session):
     with TestServer() as server:
@@ -112,6 +113,7 @@ def test_request_and_respond(session):
         request_and_respond(server.url, "", "-m abc --message xyz", "--count 2")
         request_and_respond(server.url, "--count 10", "", "--count 10")
         request_and_respond(server.url, "--count 10 --rate 1000", "", "--count 10")
+        request_and_respond(server.url, "", "--user harold --password when", "--user maude --password why --count 1")
 
 def test_message(session):
     with TestServer() as server:
