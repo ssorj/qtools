@@ -17,9 +17,6 @@
 # under the License.
 #
 
-import argparse
-import sys
-
 from plano import *
 
 def open_test_session(session):
