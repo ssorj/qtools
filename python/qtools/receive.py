@@ -132,7 +132,7 @@ class _Handler(LinkHandler):
             json = _json.dumps(data)
             out.append(json)
         else:
-            out.append(message.body)
+            out.append(str(message.body))
 
         self.command.output_thread.push_line("".join(out))
 
