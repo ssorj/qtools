@@ -163,7 +163,7 @@ class LinkHandler(_handlers.MessagingHandler):
 
             self.command.info("Connecting to {0}", connection_url)
 
-            allowed_mechs = self.command.allowed_mechs.encode("utf-8")
+            allowed_mechs = self.command.allowed_mechs.encode("ascii")
 
             connection = event.container.connect(connection_url,
                                                  user=self.command.user,
