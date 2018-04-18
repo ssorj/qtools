@@ -345,8 +345,8 @@ def process_input_line(line):
         data = _json.loads(line)
         message = convert_data_to_message(data)
     else:
-#        line = unicode(line)
-        message = _proton.Message(line)
+        body = line.decode()
+        message = _proton.Message(body)
 
     return message
 
