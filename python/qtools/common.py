@@ -332,6 +332,9 @@ def _summarize_message(message):
     if desc is None:
         return "message"
 
+    if isinstance(desc, _proton.Described):
+        desc = desc.value
+
     if len(desc) > 16:
         desc = "{0}...".format(desc[:12])
 
