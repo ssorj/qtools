@@ -67,7 +67,7 @@ test: build
 	scripts/run-tests ${VIRTUALENV_ENABLED}
 
 .PHONY: big-test
-big-test: test test-centos test-fedora test-ubuntu
+big-test: test test-centos test-fedora test-ubuntu-xenial
 
 .PHONY: test-centos
 test-centos:
@@ -88,6 +88,11 @@ test-fedora:
 test-ubuntu:
 	sudo docker build -f scripts/test-ubuntu.dockerfile -t ${USER}/qtools-test-ubuntu --build-arg CACHE_BUST=$${RANDOM} .
 	sudo docker run ${USER}/qtools-test-ubuntu
+
+.PHONY: test-ubuntu-xenial
+test-ubuntu-xenial:
+	sudo docker build -f scripts/test-ubuntu-xenial.dockerfile -t ${USER}/qtools-test-ubuntu-xenial --build-arg CACHE_BUST=$${RANDOM} .
+	sudo docker run ${USER}/qtools-test-ubuntu-xenial
 
 .PHONY: test-ubuntu-trusty
 test-ubuntu-trusty:
