@@ -23,211 +23,67 @@ from __future__ import print_function
 from __future__ import unicode_literals
 from __future__ import with_statement
 
-import collections as _collections
-import proton as _proton
-import proton.handlers as _handlers
-import proton.reactor as _reactor
-import uuid as _uuid
+import commandant as _commandant
 
+from .brokerlib import *
 from .common import *
 from .common import _summarize
 
 _description = "An AMQP message broker for testing"
 
-class BrokerCommand(MessagingCommand):
+class BrokerCommand(_commandant.Command):
     def __init__(self, home_dir):
-        super(BrokerCommand, self).__init__(home_dir, "qbroker", _Handler(self))
+        super(BrokerCommand, self).__init__(home_dir, "qbroker")
 
         self.description = _description
 
+        self.add_argument("--id", metavar="ID",
+                          help="Set the container identity to ID")
         self.add_argument("--host", metavar="HOST", default="127.0.0.1",
                           help="Listen for connections on HOST (default 127.0.0.1)")
         self.add_argument("--port", metavar="PORT", default=5672,
                           help="Listen for connections on PORT (default 5672)")
 
+        self.broker = None
+
     def init(self):
         super(BrokerCommand, self).init()
 
-        self.host = self.args.host
-        self.port = self.args.port
+        assert self.broker is None
 
-class _Queue(object):
-    def __init__(self, command, address):
-        self.command = command
-        self.address = address
+        self.broker = _Broker(self, self.args.host, self.args.port)
 
-        self.messages = _collections.deque()
-        self.consumers = _collections.deque()
+        self.id = self.args.id
 
-        self.command.info("Created {0}", self)
+        if self.id is None:
+            self.id = "{0}-{1}".format(self.name, unique_id())
 
-    def __repr__(self):
-        return "queue '{0}'".format(self.address)
+        self.broker.container.container_id = self.id
 
-    def add_consumer(self, link):
-        assert link.is_sender
-        assert link not in self.consumers
+    def run(self):
+        self.broker.run()
 
-        self.consumers.append(link)
+    def print_message(self, message, *args):
+        summarized_args = [_summarize(x) for x in args]
+        super(BrokerCommand, self).print_message(message, *summarized_args)
 
-        self.command.info("Added consumer for {0} to {1}", link.connection, self)
-
-    def remove_consumer(self, link):
-        assert link.is_sender
-
-        try:
-            self.consumers.remove(link)
-        except ValueError:
-            return
-
-        self.command.info("Removed consumer for {0} from {1}", link.connection, self)
-
-    def store_message(self, delivery, message):
-        self.messages.append(message)
-
-        self.command.notice("Stored {0} from {1} on {2}", message, delivery.connection, self)
-
-    def forward_messages(self, link):
-        assert link.is_sender
-
-        while link.credit > 0:
-            try:
-                message = self.messages.popleft()
-            except IndexError:
-                break
-
-            link.send(message)
-
-            self.command.notice("Forwarded {0} on {1} to {2}", message, self, link.connection)
-
-    def forward_messages(self):
-        credit = sum([x.credit for x in self.consumers])
-        sent = 0
-
-        if credit == 0:
-            return
-
-        while sent < credit:
-            for consumer in self.consumers:
-                if consumer.credit == 0:
-                    continue
-
-                try:
-                    message = self.messages.popleft()
-                except IndexError:
-                    self.consumers.rotate(sent)
-                    return
-
-                consumer.send(message)
-                sent += 1
-
-                self.command.notice("Forwarded {0} on {1} to {2}", message, self, consumer.connection)
-
-        self.consumers.rotate(sent)
-
-class _Handler(_handlers.MessagingHandler):
-    def __init__(self, command):
-        super(_Handler, self).__init__()
+class _Broker(Broker):
+    def __init__(self, command, host, port):
+        super(_Broker, self).__init__(host, port)
 
         self.command = command
-        self.queues = dict()
-        self.verbose = False
 
-    def on_start(self, event):
-        interface = "{0}:{1}".format(self.command.host, self.command.port)
+    def info(self, message, *args):
+        self.command.info(message, *args)
 
-        self.acceptor = event.container.listen(interface)
+    def notice(self, message, *args):
+        self.command.notice(message, *args)
 
-        self.command.notice("Listening for connections on '{0}'", interface)
+    def warn(self, message, *args):
+        self.command.warn(message, *args)
 
-    def get_queue(self, address):
-        try:
-            queue = self.queues[address]
-        except KeyError:
-            queue = self.queues[address] = _Queue(self.command, address)
+    def error(self, message, *args):
+        self.command.error(message, *args)
 
-        return queue
-
-    def on_link_opening(self, event):
-        if event.link.is_sender:
-            if event.link.remote_source.dynamic:
-                address = str(_uuid.uuid4())
-            else:
-                address = event.link.remote_source.address
-
-            assert address is not None
-
-            event.link.source.address = address
-
-            queue = self.get_queue(address)
-            queue.add_consumer(event.link)
-
-        if event.link.is_receiver:
-            address = event.link.remote_target.address
-            event.link.target.address = address
-
-    def on_link_closing(self, event):
-        if event.link.is_sender:
-            queue = self.queues[event.link.source.address]
-            queue.remove_consumer(event.link)
-
-    def on_connection_opening(self, event):
-        # XXX I think this should happen automatically
-        event.connection.container = event.container.container_id
-
-    def on_connection_opened(self, event):
-        self.command.notice("Opened connection from {0}", event.connection)
-
-    def on_connection_closing(self, event):
-        self.remove_consumers(event.connection)
-
-    def on_connection_closed(self, event):
-        self.command.notice("Closed connection from {0}", event.connection)
-
-    def on_disconnected(self, event):
-        self.command.notice("Disconnected from {0}", event.connection)
-
-        self.remove_consumers(event.connection)
-
-    def remove_consumers(self, connection):
-        link = connection.link_head(_proton.Endpoint.REMOTE_ACTIVE)
-
-        while link is not None:
-            if link.is_sender:
-                queue = self.queues[link.source.address]
-                queue.remove_consumer(link)
-
-            link = link.next(_proton.Endpoint.REMOTE_ACTIVE)
-
-    def on_sendable(self, event):
-        queue = self.get_queue(event.link.source.address)
-        queue.forward_messages()
-
-    def on_settled(self, event):
-        delivery = event.delivery
-
-        template = "{0} {{0}} {1} to {2}"
-        template = template.format(_summarize(event.connection),
-                                   _summarize(delivery),
-                                   _summarize(event.link.source))
-
-        if delivery.remote_state == delivery.ACCEPTED:
-            self.command.info(template, "accepted")
-        elif delivery.remote_state == delivery.REJECTED:
-            self.command.warn(template, "rejected")
-        elif delivery.remote_state == delivery.RELEASED:
-            self.command.notice(template, "released")
-        elif delivery.remote_state == delivery.MODIFIED:
-            self.command.notice(template, "modified")
-
-    def on_message(self, event):
-        message = event.message
-        delivery = event.delivery
-        address = event.link.target.address
-
-        if address is None:
-            address = message.address
-
-        queue = self.get_queue(address)
-        queue.store_message(delivery, message)
-        queue.forward_messages()
+    def fail(self, message, *args):
+        self.command.fail(message, *args)
