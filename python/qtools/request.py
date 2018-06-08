@@ -110,7 +110,7 @@ class _Handler(LinkHandler):
             options = _reactor.AtMostOnce()
 
         sender = event.container.create_sender(connection, address, options=options)
-        receiver = event.container.create_receiver(connection, None, dynamic=True)
+        receiver = event.container.create_receiver(connection, None, dynamic=True, name="responses")
 
         self.senders.appendleft(sender)
         self.receivers_by_sender[sender] = receiver

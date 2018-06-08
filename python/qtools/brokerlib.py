@@ -31,11 +31,20 @@ import uuid as _uuid
 import sys as _sys
 
 class Broker(object):
-    def __init__(self, host, port):
+    def __init__(self, host, port, id=None, user=None, password=None):
         self.host = host
         self.port = port
+        self.id = id
+        self.user = user
+        self.password = password
 
         self.container = _reactor.Container(_Handler(self))
+
+    def init(self):
+        if self.id is None:
+            self.id = "broker-{0}".format(_uuid.uuid4())
+
+        self.container.container_id = self.id
 
     def info(self, message, *args):
         pass
@@ -144,7 +153,7 @@ class _Handler(_handlers.MessagingHandler):
     def on_link_opening(self, event):
         if event.link.is_sender:
             if event.link.remote_source.dynamic:
-                address = str(_uuid.uuid4())
+                address = "{0}/{1}".format(event.connection.remote_container, event.link.name)
             else:
                 address = event.link.remote_source.address
 

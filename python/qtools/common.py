@@ -203,19 +203,17 @@ class LinkHandler(_handlers.MessagingHandler):
 
     def on_settled(self, event):
         delivery = event.delivery
-
-        template = "{0} {{0}} {1}"
-        template = template.format(_summarize(event.connection),
-                                   _summarize(delivery))
+        connection = event.connection
+        template = "{0} {1} {2}"
 
         if delivery.remote_state == delivery.ACCEPTED:
-            self.command.info(template, "accepted")
+            self.command.info(template, connection, "accepted", delivery)
         elif delivery.remote_state == delivery.REJECTED:
-            self.command.warn(template, "rejected")
+            self.command.warn(template, connection, "rejected", delivery)
         elif delivery.remote_state == delivery.RELEASED:
-            self.command.notice(template, "released")
+            self.command.notice(template, connection, "released", delivery)
         elif delivery.remote_state == delivery.MODIFIED:
-            self.command.notice(template, "modified")
+            self.command.notice(template, connection, "modified", delivery)
 
     def on_transport_error(self, event):
         cond = event.transport.condition

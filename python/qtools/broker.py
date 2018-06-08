@@ -49,16 +49,15 @@ class BrokerCommand(_commandant.Command):
     def init(self):
         super(BrokerCommand, self).init()
 
-        assert self.broker is None
-
-        self.broker = _Broker(self, self.args.host, self.args.port)
-
         self.id = self.args.id
 
         if self.id is None:
             self.id = "{0}-{1}".format(self.name, unique_id())
 
-        self.broker.container.container_id = self.id
+        assert self.broker is None
+
+        self.broker = _Broker(self, self.args.host, self.args.port, self.id)
+        self.broker.init()
 
     def run(self):
         self.broker.run()
@@ -68,8 +67,8 @@ class BrokerCommand(_commandant.Command):
         super(BrokerCommand, self).print_message(message, *summarized_args)
 
 class _Broker(Broker):
-    def __init__(self, command, host, port):
-        super(_Broker, self).__init__(host, port)
+    def __init__(self, command, host, port, id):
+        super(_Broker, self).__init__(host, port, id)
 
         self.command = command
 
