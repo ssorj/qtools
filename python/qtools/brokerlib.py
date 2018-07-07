@@ -1,4 +1,3 @@
-#
 # Licensed to the Apache Software Foundation (ASF) under one
 # or more contributor license agreements.  See the NOTICE file
 # distributed with this work for additional information
@@ -24,11 +23,15 @@ from __future__ import unicode_literals
 from __future__ import with_statement
 
 import collections as _collections
+import os as _os
 import proton as _proton
 import proton.handlers as _handlers
 import proton.reactor as _reactor
 import uuid as _uuid
+import shutil as _shutil
+import subprocess as _subprocess
 import sys as _sys
+import tempfile as _tempfile
 
 class Broker(object):
     def __init__(self, host, port, id=None, user=None, password=None):
@@ -38,13 +41,38 @@ class Broker(object):
         self.user = user
         self.password = password
 
-        self.container = _reactor.Container(_Handler(self))
-
-    def init(self):
         if self.id is None:
             self.id = "broker-{0}".format(_uuid.uuid4())
 
-        self.container.container_id = self.id
+        self.container = _reactor.Container(_Handler(self), self.id)
+
+        self._config_dir = None
+
+    def init(self):
+        if self.user is not None:
+            if self.password is None:
+                self.fail("A password is required for user authentication")
+
+            self._init_sasl_config()
+
+    def _init_sasl_config(self):
+        self._config_dir = _tempfile.mkdtemp(prefix="brokerlib-", suffix="")
+        config_file = _os.path.join(self._config_dir, "proton-server.conf")
+        sasldb_file = _os.path.join(self._config_dir, "users.sasldb")
+
+        _os.environ["PN_SASL_CONFIG_PATH"] = self._config_dir
+
+        with open(config_file, "w") as f:
+            f.write("sasldb_path: {0}\n".format(sasldb_file))
+            f.write("mech_list: PLAIN SCRAM-SHA-1\n")
+
+        command = "echo '{0}' | saslpasswd2 -p -f {1} '{2}'".format \
+                  (self.password, sasldb_file, self.user)
+
+        try:
+            _subprocess.check_call(command, shell=True)
+        except _subprocess.CalledProcessError as e:
+            self.fail("Failed adding user to SASL database: {0}", e)
 
     def info(self, message, *args):
         pass
@@ -65,6 +93,9 @@ class Broker(object):
 
     def run(self):
         self.container.run()
+
+        if _os.path.exists(self._config_dir):
+            _shutil.rmtree(self.dir, ignore_errors=True)
 
 class _Queue(object):
     def __init__(self, broker, address):
@@ -206,11 +237,10 @@ class _Handler(_handlers.MessagingHandler):
         queue.forward_messages()
 
     def on_settled(self, event):
-        delivery = event.delivery
-
-        template = "{0} {1} {2} to {3}"
+        template = "Container '{0}' {1} {2} to {3}"
         container = event.connection.remote_container
         source = event.link.source
+        delivery = event.delivery
 
         if delivery.remote_state == delivery.ACCEPTED:
             self.broker.info(template, container, "accepted", delivery, source)

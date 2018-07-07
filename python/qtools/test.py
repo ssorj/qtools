@@ -78,10 +78,17 @@ def request_and_respond(url, qmessage_args="", qrequest_args="", qrespond_args="
     return output[:-1]
 
 class TestServer(object):
-    def __init__(self):
+    def __init__(self, user=None, password=None):
         port = random_port()
 
-        self.proc = start_process("qbroker --verbose --port {0}", port)
+        if user is None:
+            assert password is None
+            self.proc = start_process("qbroker --verbose --port {0}", port)
+        else:
+            assert password is not None
+            self.proc = start_process("qbroker --verbose --port {0} --user {1} --password {2}",
+                                      port, user, password)
+
         self.proc.url = "//127.0.0.1:{0}/q0".format(port)
 
     def __enter__(self):
@@ -100,6 +107,11 @@ def test_send_and_receive(session):
         send_and_receive(server.url, "--count 10", "", "--count 10")
         send_and_receive(server.url, "--count 10 --rate 1000", "", "--count 10")
         send_and_receive(server.url, "", "--allowed-mechs anonymous --user harry", "--allowed-mechs anonymous --user sally --count 1")
+
+def disabled_test_user_password_auth(session):
+    with TestServer(user="harold", password="x") as server:
+        body = send_and_receive(server.url, "--body abc123", "--user harold --password x", "--count 1 --no-prefix --user harold --password x")
+        assert body == "abc123", body
 
 def test_request_and_respond(session):
     with TestServer() as server:

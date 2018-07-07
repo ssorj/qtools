@@ -202,18 +202,18 @@ class LinkHandler(_handlers.MessagingHandler):
             self.command.ready.set()
 
     def on_settled(self, event):
+        template = "Container '{0}' {1} {2}"
+        container = event.connection.remote_container
         delivery = event.delivery
-        connection = event.connection
-        template = "{0} {1} {2}"
 
         if delivery.remote_state == delivery.ACCEPTED:
-            self.command.info(template, connection, "accepted", delivery)
+            self.command.info(template, container, "accepted", delivery)
         elif delivery.remote_state == delivery.REJECTED:
-            self.command.warn(template, connection, "rejected", delivery)
+            self.command.warn(template, container, "rejected", delivery)
         elif delivery.remote_state == delivery.RELEASED:
-            self.command.notice(template, connection, "released", delivery)
+            self.command.notice(template, container, "released", delivery)
         elif delivery.remote_state == delivery.MODIFIED:
-            self.command.notice(template, connection, "modified", delivery)
+            self.command.notice(template, container, "modified", delivery)
 
     def on_transport_error(self, event):
         cond = event.transport.condition

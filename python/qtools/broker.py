@@ -37,12 +37,16 @@ class BrokerCommand(_commandant.Command):
 
         self.description = _description
 
-        self.add_argument("--id", metavar="ID",
-                          help="Set the container identity to ID")
         self.add_argument("--host", metavar="HOST", default="127.0.0.1",
                           help="Listen for connections on HOST (default 127.0.0.1)")
         self.add_argument("--port", metavar="PORT", default=5672,
                           help="Listen for connections on PORT (default 5672)")
+        self.add_argument("--id", metavar="ID",
+                          help="Set the container identity to ID (default is generated)")
+        # self.add_argument("--user", metavar="USER",
+        #                   help="Require USER")
+        # self.add_argument("--password", metavar="SECRET",
+        #                   help="Require SECRET")
 
         self.broker = None
 
@@ -56,7 +60,13 @@ class BrokerCommand(_commandant.Command):
 
         assert self.broker is None
 
-        self.broker = _Broker(self, self.args.host, self.args.port, self.id)
+        self.broker = _Broker(self, self.args.host, self.args.port, id=self.id)
+
+        # self.broker = _Broker(self, self.args.host, self.args.port,
+        #                       id=self.id,
+        #                       user=self.args.user,
+        #                       password=self.args.password)
+
         self.broker.init()
 
     def run(self):
@@ -67,8 +77,8 @@ class BrokerCommand(_commandant.Command):
         super(BrokerCommand, self).print_message(message, *summarized_args)
 
 class _Broker(Broker):
-    def __init__(self, command, host, port, id):
-        super(_Broker, self).__init__(host, port, id)
+    def __init__(self, command, host, port, id=None, user=None, password=None):
+        super(_Broker, self).__init__(host, port, id, user, password)
 
         self.command = command
 
