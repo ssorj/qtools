@@ -262,3 +262,33 @@ class _Handler(_handlers.MessagingHandler):
         queue = self.get_queue(address)
         queue.store_message(delivery, message)
         queue.forward_messages()
+
+if __name__ == "__main__":
+    def _print(message, *args):
+        message = message.format(*args)
+        _sys.stderr.write("{0}\n".format(message))
+        _sys.stderr.flush()
+
+    class _Broker(Broker):
+        def info(self, message, *args): _print(message, *args)
+        def notice(self, message, *args): _print(message, *args)
+        def warn(self, message, *args): _print(message, *args)
+
+    try:
+        host, port = _sys.argv[1:3]
+    except IndexError:
+        _print("Usage: brokerlib <host> <port>")
+        _sys.exit(1)
+
+    try:
+        port = int(port)
+    except ValueError:
+        _print("The port must be an integer")
+        _sys.exit(1)
+
+    broker = _Broker(host, port)
+
+    try:
+        broker.run()
+    except KeyboardInterrupt:
+        pass
