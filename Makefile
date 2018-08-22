@@ -25,9 +25,9 @@ INSTALLED_QTOOLS_HOME = ${PREFIX}/share/qtools
 
 VIRTUALENV_ENABLED := 1
 
-export QTOOLS_HOME = ${PWD}/build/qtools
-export PATH := ${PWD}/build/bin:${PATH}
-export PYTHONPATH := ${QTOOLS_HOME}/python:${PWD}/python:${PYTHONPATH}
+export QTOOLS_HOME = ${CURDIR}/build/qtools
+export PATH := ${CURDIR}/build/bin:${PATH}
+export PYTHONPATH := ${QTOOLS_HOME}/python:${CURDIR}/python:${PYTHONPATH}
 
 VERSION := $(shell cat VERSION.txt)
 
