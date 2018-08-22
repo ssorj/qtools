@@ -77,7 +77,7 @@ of a message source or target, such as a queue or topic.
     qsend ADDRESS-URL [ADDRESS-URL ...]
 
 An address URL has optional scheme and server parts.  The default
-scheme is 'amqp', and the default 'server' is '127.0.0.1:5672'.  You
+scheme is 'amqp', and the default server is '127.0.0.1:5672'.  You
 can use the `--server` option to change the default server.
 
     [SCHEME:][//SERVER/]ADDRESS
@@ -91,12 +91,12 @@ The receive and respond commands run forever unless you use the
 of messages or requests.
 
 Tools that read from or write to the console take the following
-options.
+options:
 
     --input FILE          Read input from FILE
     --output FILE         Write output to FILE
 
-With a few exceptions, all the tools share these options.
+With a few exceptions, all the tools share these options:
 
     -h, --help            Print help output
     --verbose             Print detailed logging
@@ -164,7 +164,7 @@ This command generates message content for use by the `qsend` and
     -> MESSAGE
 
 The output is in JSON format.  The send and request tools can consume
-it.  Usually you pipe it in, like this.
+it.  Usually you pipe it in, like this:
 
     $ qmessage | qsend queue1
     $ qmessage --rate 1 | qrequest amqp://example.net/jobs
