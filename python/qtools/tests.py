@@ -20,7 +20,7 @@
 from plano import *
 
 def open_test_session(session):
-    set_message_threshold("error")
+    enable_logging(level="error")
 
 def start_qmessage(args, **kwargs):
     return start_process("qmessage --verbose {0}", args, **kwargs)

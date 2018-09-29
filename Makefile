@@ -55,7 +55,7 @@ clean:
 
 .PHONY: build
 build: ${BIN_TARGETS} ${PYTHON_TARGETS} build/prefix.txt
-	scripts/run-smoke-tests
+	scripts/smoke-test
 
 .PHONY: install
 install: build
@@ -64,7 +64,7 @@ install: build
 
 .PHONY: test
 test: build
-	scripts/run-tests ${VIRTUALENV_ENABLED}
+	scripts/test ${VIRTUALENV_ENABLED}
 
 .PHONY: big-test
 big-test: test test-centos test-fedora test-ubuntu-xenial

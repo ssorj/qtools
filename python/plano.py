@@ -78,14 +78,30 @@ _message_output = STDERR
 _message_threshold = _notice
 
 def set_message_output(writeable):
-    global _message_output
-    _message_output = writeable
+    warn("Deprecated! Use enable_logging(output=output) instead")
+    enable_logging(output=writeable)
 
 def set_message_threshold(level):
-    assert level in _message_levels
+    warn("Deprecated! Use enable_logging(level=level) instead")
+    enable_logging(level=level)
 
+def enable_logging(level=None, output=None):
+    if level is not None:
+        assert level in _message_levels
+
+        global _message_threshold
+        _message_threshold = _message_levels.index(level)
+
+    if output is not None:
+        if _is_string(output):
+            output = open(output, "w")
+
+        global _message_output
+        _message_output = output
+
+def disable_logging():
     global _message_threshold
-    _message_threshold = _message_levels.index(level)
+    _message_threshold = 4
 
 def fail(message, *args):
     error(message, *args)
@@ -117,15 +133,16 @@ def exit(arg=None, *args):
     if _is_string(arg):
         error(arg, args)
         _sys.exit(1)
-    elif isinstance(arg, _types.IntType):
+
+    if isinstance(arg, int):
         if arg > 0:
             error("Exiting with code {0}", arg)
         else:
             notice("Exiting with code {0}", arg)
 
         _sys.exit(arg)
-    else:
-        raise Exception()
+
+    raise Exception()
 
 def _print_message(category, message, args):
     if _message_output is None:
@@ -159,13 +176,13 @@ def eprint(*args, **kwargs):
     print(*args, file=_sys.stderr, **kwargs)
 
 def flush():
-    _sys.stdout.flush()
-    _sys.stderr.flush()
+    STDOUT.flush()
+    STDERR.flush()
 
 absolute_path = _os.path.abspath
 normalize_path = _os.path.normpath
 real_path = _os.path.realpath
-exists = _os.path.exists
+exists = _os.path.lexists
 is_absolute = _os.path.isabs
 is_dir = _os.path.isdir
 is_file = _os.path.isfile
@@ -221,6 +238,8 @@ def program_name(command=None):
             return file_name(arg)
 
 def which(program_name):
+    assert "PATH" in ENV
+
     for dir in ENV["PATH"].split(PATH_VAR_SEP):
         program = join(dir, program_name)
 
@@ -232,12 +251,16 @@ def read(file):
         return f.read()
 
 def write(file, string):
+    _make_dir(parent_dir(file))
+
     with _codecs.open(file, encoding="utf-8", mode="w") as f:
         f.write(string)
 
     return file
 
 def append(file, string):
+    _make_dir(parent_dir(file))
+
     with _codecs.open(file, encoding="utf-8", mode="a") as f:
         f.write(string)
 
@@ -249,9 +272,13 @@ def prepend(file, string):
 
     return write(file, prepended)
 
-# XXX Should this work on directories?
 def touch(file):
-    return append(file, "")
+    try:
+        _os.utime(file, None)
+    except OSError:
+        append(file, "")
+
+    return file
 
 def tail(file, n):
     return "".join(tail_lines(file, n))
@@ -261,12 +288,16 @@ def read_lines(file):
         return f.readlines()
 
 def write_lines(file, lines):
+    _make_dir(parent_dir(file))
+
     with _codecs.open(file, encoding="utf-8", mode="r") as f:
         f.writelines(lines)
 
     return file
 
 def append_lines(file, lines):
+    _make_dir(parent_dir(file))
+
     with _codecs.open(file, encoding="utf-8", mode="a") as f:
         f.writelines(string)
 
@@ -274,6 +305,8 @@ def append_lines(file, lines):
 
 def prepend_lines(file, lines):
     orig_lines = read_lines(file)
+
+    _make_dir(parent_dir(file))
 
     with _codecs.open(file, encoding="utf-8", mode="w") as f:
         f.writelines(lines)
@@ -307,6 +340,8 @@ def read_json(file):
         return _json.load(f)
 
 def write_json(file, obj):
+    _make_dir(parent_dir(file))
+
     with _codecs.open(file, encoding="utf-8", mode="w") as f:
         return _json.dump(obj, f, indent=4, separators=(",", ": "), sort_keys=True)
 
@@ -334,19 +369,7 @@ class temp_file(object):
         return self.file
 
     def __exit__(self, exc_type, exc_value, traceback):
-        if exists(self.file):
-            _os.remove(self.file)
-
-class temp_dir(object):
-    def __init__(self, suffix=""):
-        self.dir = make_temp_dir(suffix=suffix)
-
-    def __enter__(self):
-        return self.dir
-
-    def __exit__(self, exc_type, exc_value, traceback):
-        if exists(self.dir):
-            _shutil.rmtree(self.dir, ignore_errors=True)
+        _remove(self.file)
 
 def unique_id(length=16):
     assert length >= 1
@@ -359,7 +382,9 @@ def unique_id(length=16):
 
 def copy(from_path, to_path):
     notice("Copying '{0}' to '{1}'", from_path, to_path)
+    return _copy(from_path, to_path)
 
+def _copy(from_path, to_path):
     if is_dir(to_path):
         to_path = join(to_path, file_name(from_path))
     else:
@@ -374,11 +399,16 @@ def copy(from_path, to_path):
 
 def move(from_path, to_path):
     notice("Moving '{0}' to '{1}'", from_path, to_path)
+    return _move(from_path, to_path)
 
+def _move(from_path, to_path):
     if is_dir(to_path):
         to_path = join(to_path, file_name(from_path))
     else:
-        make_dir(parent_dir(to_path))
+        parent_path = parent_dir(to_path)
+
+        if parent_path:
+            _make_dir(parent_path)
 
     _shutil.move(from_path, to_path)
 
@@ -398,7 +428,9 @@ def rename(path, expr, replacement):
 
 def remove(path):
     notice("Removing '{0}'", path)
+    return _remove(path)
 
+def _remove(path):
     if not exists(path):
         return
 
@@ -458,16 +490,24 @@ def find_only_one(dir, *patterns):
     if len(paths) == 0:
         return
 
+    if len(paths) != 1:
+        fail("Found multiple files: {0}", ", ".join(paths))
+
     assert len(paths) == 1
 
     return paths[0]
-
-# find_via_expr?
 
 def string_replace(string, expr, replacement, count=0):
     return _re.sub(expr, replacement, string, count)
 
 def make_dir(dir):
+    notice("Making directory '{0}'", dir)
+    return _make_dir(dir)
+
+def _make_dir(dir):
+    if dir == "":
+        return dir
+
     if not exists(dir):
         _os.makedirs(dir)
 
@@ -476,7 +516,9 @@ def make_dir(dir):
 # Returns the current working directory so you can change it back
 def change_dir(dir):
     notice("Changing directory to '{0}'", dir)
+    return _change_dir(dir)
 
+def _change_dir(dir):
     cwd = current_dir()
     _os.chdir(dir)
     return cwd
@@ -502,11 +544,23 @@ class working_dir(object):
         self.prev_dir = None
 
     def __enter__(self):
-        self.prev_dir = change_dir(self.dir)
+        if self.dir is None or self.dir == ".":
+            return
+
+        if not exists(self.dir):
+            _make_dir(self.dir)
+
+        self.prev_dir = _change_dir(self.dir)
+
+        notice("Using working directory '{0}'", self.dir)
+
         return self.dir
 
     def __exit__(self, exc_type, exc_value, traceback):
-        change_dir(self.prev_dir)
+        if self.dir is None or self.dir == ".":
+            return
+
+        _change_dir(self.prev_dir)
 
 class temp_working_dir(working_dir):
     def __init__(self):
@@ -514,9 +568,26 @@ class temp_working_dir(working_dir):
 
     def __exit__(self, exc_type, exc_value, traceback):
         super(temp_working_dir, self).__exit__(exc_type, exc_value, traceback)
+        _remove(self.dir)
 
-        if exists(self.dir):
-            _shutil.rmtree(self.dir, ignore_errors=True)
+class working_env(object):
+    def __init__(self, **env_vars):
+        self.env_vars = env_vars
+        self.prev_env_vars = dict()
+
+    def __enter__(self):
+        for name, value in self.env_vars.items():
+            if name in ENV:
+                self.prev_env_vars[name] = ENV[name]
+
+            ENV[name] = str(value)
+
+    def __exit__(self, exc_type, exc_value, traceback):
+        for name, value in self.env_vars.items():
+            if name in self.prev_env_vars:
+                ENV[name] = self.prev_env_vars[name]
+            else:
+                del ENV[name]
 
 def call(command, *args, **kwargs):
     proc = start_process(command, *args, **kwargs)
@@ -530,7 +601,7 @@ def call_for_stdout(command, *args, **kwargs):
     kwargs["stdout"] = _subprocess.PIPE
 
     proc = start_process(command, *args, **kwargs)
-    output = proc.communicate()[0]
+    output = proc.communicate()[0].decode("utf-8")
     exit_code = proc.poll()
 
     if exit_code != 0:
@@ -545,7 +616,7 @@ def call_for_stderr(command, *args, **kwargs):
     kwargs["stderr"] = _subprocess.PIPE
 
     proc = start_process(command, *args, **kwargs)
-    output = proc.communicate()[1]
+    output = proc.communicate()[1].decode("utf-8")
     exit_code = proc.poll()
 
     if exit_code != 0:
@@ -557,23 +628,20 @@ def call_for_stderr(command, *args, **kwargs):
     return output
 
 def call_and_print_on_error(command, *args, **kwargs):
-    with temp_file() as output_file:
-        try:
-            with open(output_file, "w") as out:
-                kwargs["output"] = out
-                call(command, *args, **kwargs)
-        except CalledProcessError:
-            eprint(read(output_file), end="")
-            raise
+    warn("Deprecated! Use call() with quiet=True instead")
+
+    kwargs["quiet"] = True
+    call(command, *args, **kwargs)
 
 _child_processes = list()
 
 class _Process(_subprocess.Popen):
-    def __init__(self, command, options, name, command_string):
+    def __init__(self, command, options, name, command_string, temp_output_file):
         super(_Process, self).__init__(command, **options)
 
         self.name = name
         self.command_string = command_string
+        self.temp_output_file = temp_output_file
 
         _child_processes.append(self)
 
@@ -595,8 +663,6 @@ def default_sigterm_handler(signum, frame):
         if proc.poll() is None:
             proc.terminate()
 
-    #_remove_temp_dir()
-
     exit(-(_signal.SIGTERM))
 
 _signal.signal(_signal.SIGTERM, default_sigterm_handler)
@@ -616,6 +682,8 @@ if _sys.platform == "linux2":
     except:
         _traceback.print_exc()
 
+# output - Send stdout and err to a file
+# quiet - No output unless there is an error
 def start_process(command, *args, **kwargs):
     if _is_string(command):
         command = command.format(*args)
@@ -641,14 +709,24 @@ def start_process(command, *args, **kwargs):
         kwargs["stdout"] = out
         kwargs["stderr"] = out
 
+    temp_output_file = None
+
+    if "quiet" in kwargs:
+        if kwargs.pop("quiet") is True:
+            temp_output_file = make_temp_file()
+            temp_output = open(temp_output_file, "w")
+
+            kwargs["stdout"] = temp_output
+            kwargs["stderr"] = temp_output
+
     if "preexec_fn" not in kwargs:
         if _libc is not None:
             kwargs["preexec_fn"] = _libc.prctl(1, _signal.SIGKILL)
 
     if "shell" in kwargs and kwargs["shell"] is True:
-        proc = _Process(command_string, kwargs, name, command_string)
+        proc = _Process(command_string, kwargs, name, command_string, temp_output_file)
     else:
-        proc = _Process(command_args, kwargs, name, command_string)
+        proc = _Process(command_args, kwargs, name, command_string, temp_output_file)
 
     debug("{0} started", proc)
 
@@ -689,7 +767,13 @@ def wait_for_process(proc):
     elif proc.returncode == -(_signal.SIGTERM):
         debug("{0} exited after termination", proc)
     else:
-        debug("{0} exited with code {1}", proc, proc.returncode)
+        debug("{0} exited with code {1}", proc, proc.exit_code)
+
+        if proc.temp_output_file is not None:
+            eprint(read(proc.temp_output_file), end="")
+
+    if proc.temp_output_file is not None:
+        _remove(proc.temp_output_file)
 
     return proc.returncode
 
@@ -720,7 +804,7 @@ def make_archive(input_dir, output_dir, archive_stem):
     assert is_dir(output_dir), output_dir
     assert _is_string(archive_stem), archive_stem
 
-    with temp_dir() as dir:
+    with temp_working_dir() as dir:
         temp_input_dir = join(dir, archive_stem)
 
         copy(input_dir, temp_input_dir)
@@ -734,11 +818,9 @@ def make_archive(input_dir, output_dir, archive_stem):
 
     return output_file
 
-def extract_archive(archive_file, output_dir):
+def extract_archive(archive_file, output_dir=None):
     assert is_file(archive_file), archive_file
-    assert is_dir(output_dir), output_dir
-
-    make_dir(output_dir)
+    assert output_dir is None or is_dir(output_dir), output_dir
 
     archive_file = absolute_path(archive_file)
 
@@ -754,7 +836,7 @@ def rename_archive(archive_file, new_archive_stem):
     if name_stem(archive_file) == new_archive_stem:
         return archive_file
 
-    with temp_dir() as dir:
+    with temp_working_dir() as dir:
         extract_archive(archive_file, dir)
 
         input_name = list_dir(dir)[0]

@@ -23,6 +23,7 @@ For more ways to build and use Docker images and packages, see
  - python-qpid-proton
  - python3-qpid-proton
  - python-argparse (required only on RHEL 6)
+ - virtualenv (for testing)
 
 ### Using Docker
 
