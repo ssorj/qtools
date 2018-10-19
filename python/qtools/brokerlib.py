@@ -232,6 +232,10 @@ class _Handler(_handlers.MessagingHandler):
 
             link = link.next(_proton.Endpoint.REMOTE_ACTIVE)
 
+    def on_link_flow(self, event):
+        if event.link.is_sender and event.link.drain_mode:
+            event.link.drained()
+
     def on_sendable(self, event):
         queue = self.get_queue(event.link.source.address)
         queue.forward_messages()
