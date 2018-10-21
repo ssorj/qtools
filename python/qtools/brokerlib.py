@@ -31,15 +31,17 @@ import uuid as _uuid
 import shutil as _shutil
 import subprocess as _subprocess
 import sys as _sys
+import time as _time
 import tempfile as _tempfile
 
 class Broker(object):
-    def __init__(self, host, port, id=None, user=None, password=None):
+    def __init__(self, host, port, id=None, user=None, password=None, ready_file=None):
         self.host = host
         self.port = port
         self.id = id
         self.user = user
         self.password = password
+        self.ready_file = ready_file
 
         if self.id is None:
             self.id = "broker-{0}".format(_uuid.uuid4())
@@ -172,6 +174,10 @@ class _Handler(_handlers.MessagingHandler):
         self.acceptor = event.container.listen(interface)
 
         self.broker.notice("Listening for connections on '{0}'", interface)
+
+        if self.broker.ready_file is not None:
+            with open(self.broker.ready_file, "w") as f:
+                f.write("ready\n")
 
     def get_queue(self, address):
         try:
