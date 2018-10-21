@@ -105,7 +105,7 @@ build/prefix.txt:
 build/bin/%: bin/%.in
 	scripts/configure-file -a qtools_home=${INSTALLED_QTOOLS_HOME} $< $@
 
-build/qtools/python/qtools/%: python/qtools/% python/qtools/common.py python/commandant.py python/plano.py
+build/qtools/python/qtools/%: python/qtools/% python/qtools/common.py python/brokerlib.py python/commandant.py python/plano.py
 	@mkdir -p ${@D}
 	cp $< $@
 

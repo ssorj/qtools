@@ -23,9 +23,9 @@ from __future__ import print_function
 from __future__ import unicode_literals
 from __future__ import with_statement
 
+import brokerlib as _brokerlib
 import commandant as _commandant
 
-from .brokerlib import *
 from .common import *
 from .common import _summarize
 
@@ -76,7 +76,7 @@ class BrokerCommand(_commandant.Command):
         summarized_args = [_summarize(x) for x in args]
         super(BrokerCommand, self).print_message(message, *summarized_args)
 
-class _Broker(Broker):
+class _Broker(_brokerlib.Broker):
     def __init__(self, command, host, port, id=None, user=None, password=None):
         super(_Broker, self).__init__(host, port, id, user, password)
 
