@@ -10,7 +10,7 @@ pipeline {
 
         stage('Test') {
             steps {
-                sh 'make big-test'
+                sh 'make test'
             }
         }
     }
