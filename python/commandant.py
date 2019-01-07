@@ -29,13 +29,14 @@ import inspect as _inspect
 import os as _os
 import runpy as _runpy
 import signal as _signal
+import subprocess as _subprocess
 import sys as _sys
 import tempfile as _tempfile
 import time as _time
 import traceback as _traceback
 
 class Command(object):
-    def __init__(self, home=None, name=None):
+    def __init__(self, home=None, name=None, standard_args=True):
         self.home = home
         self.name = name
 
@@ -44,12 +45,13 @@ class Command(object):
 
         self._args = None
 
-        self.add_argument("--quiet", action="store_true",
-                          help="Print no logging to the console")
-        self.add_argument("--verbose", action="store_true",
-                          help="Print detailed logging to the console")
-        self.add_argument("--init-only", action="store_true",
-                          help=_argparse.SUPPRESS)
+        if standard_args:
+            self.add_argument("--quiet", action="store_true",
+                              help="Print no logging to the console")
+            self.add_argument("--verbose", action="store_true",
+                              help="Print detailed logging to the console")
+            self.add_argument("--init-only", action="store_true",
+                              help=_argparse.SUPPRESS)
 
         if self.name is None:
             self.name = self._parser.prog
@@ -156,34 +158,25 @@ class TestTimedOut(Exception):
 class TestSkipped(Exception):
     pass
 
-_test_epilog = """
-patterns:
-  The --include and --exclude options take comma-separated lists of
-  shell-style match expressions.  '*' matches multiple characters, and
-  '?' matches exactly one character.  Take care to escape these so
-  that your shell doesn't expand them.
-"""
-
 class TestCommand(Command):
     def __init__(self, test_modules, home=None, name=None):
         super(TestCommand, self).__init__(home=home, name=name)
 
-        self.test_modules = []
+        self.test_modules = list()
 
         for module in test_modules:
             _TestModule(self, module)
 
-        self.epilog = _test_epilog
-
         self.test_prefixes = ["test_"]
 
-        self.add_argument("--list", action="store_true",
+        self.add_argument("-l", "--list", action="store_true",
                           help="Print the test names and exit")
-        self.add_argument("--include", metavar="PATTERNS",
-                          help="Run only tests with names matching PATTERNS (default '*')",
-                          default="*")
-        self.add_argument("--exclude", metavar="PATTERNS",
-                          help="Do not run tests with names matching PATTERNS")
+        self.add_argument("include", metavar="PATTERN", nargs="*",
+                          help="Run only tests with names matching PATTERN. " \
+                          "This option can be repeated.")
+        self.add_argument("-e", "--exclude", metavar="PATTERN", action="append", default=list(),
+                          help="Do not run tests with names matching PATTERN. " \
+                          "This option can be repeated.")
         self.add_argument("--iterations", metavar="COUNT", type=int, default=1,
                           help="Run the tests COUNT times (default 1)")
         self.add_argument("--timeout", metavar="SECONDS", type=int, default=300,
@@ -193,18 +186,24 @@ class TestCommand(Command):
         super(TestCommand, self).init()
 
         self.list_only = self.args.list
-        self.include_patterns = self.args.include.split(",")
-        self.exclude_patterns = []
+        self.include_patterns = self.args.include
+        self.exclude_patterns = list()
         self.iterations = self.args.iterations
         self.test_timeout = self.args.timeout
 
         if self.args.exclude is not None:
-            self.exclude_patterns = self.args.exclude.split(",")
+            self.exclude_patterns = self.args.exclude
 
         for module in self.test_modules:
             module.init()
 
     def run(self):
+        if self.list_only:
+            for module in self.test_modules:
+                module.list_tests()
+
+            return
+
         sessions = list()
 
         for i in range(self.iterations):
@@ -214,22 +213,28 @@ class TestCommand(Command):
 
                 module.run_tests(session)
 
-        for session in sessions:
-            if len(session.failed_tests) != 0:
-                break
-        else:
-            print("RESULT: All tests passed")
-            return
+        total = sum([len(x.tests) for x in sessions])
+        skipped = sum([len(x.skipped_tests) for x in sessions])
+        failed = sum([len(x.failed_tests) for x in sessions])
 
-        print("RESULT: Some tests failed")
-        _sys.exit(1)
+        if total == 0:
+            self.fail("No tests ran");
+
+        if failed == 0:
+            print("RESULT: All tests passed ({} skipped)".format(skipped))
+        else:
+            print("RESULT: {} {} failed ({} skipped)".format \
+                  (failed, _plural("test", failed), skipped))
+            _sys.exit(1)
 
 class _TestSession(object):
     def __init__(self, module):
         self.module = module
 
-        self.passed_tests = []
-        self.failed_tests = []
+        self.tests = list()
+        self.skipped_tests = list()
+        self.passed_tests = list()
+        self.failed_tests = list()
 
 class _TestFunction(object):
     def __init__(self, module, function):
@@ -257,8 +262,8 @@ class _TestModule(object):
         self.open_function = None
         self.close_function = None
 
-        self.test_functions = []
-        self.test_functions_by_name = {}
+        self.test_functions = list()
+        self.test_functions_by_name = dict()
 
         self.command.test_modules.append(self)
 
@@ -279,44 +284,56 @@ class _TestModule(object):
         if self.close_function is not None:
             assert _inspect.isroutine(self.close_function), self.close_function
 
-        members = _inspect.getmembers(self.module, _inspect.isroutine)
+        functions = dict(_inspect.getmembers(self.module, _inspect.isroutine)).values()
+
+        def line_number(function):
+            try:
+                return function.__code__.co_firstlineno
+            except AttributeError:
+                return 0
 
         def is_test_function(name):
             for prefix in self.command.test_prefixes:
                 if name.startswith(prefix):
                     return True
 
-        def included(name):
+        def included(names):
+            if len(self.command.include_patterns) == 0:
+                return True
+
             for pattern in self.command.include_patterns:
-                if _fnmatch.fnmatchcase(name, pattern):
-                    return True
+                 if _fnmatch.filter(names, pattern):
+                     return True
 
-        def excluded(name):
+        def excluded(names):
             for pattern in self.command.exclude_patterns:
-                if _fnmatch.fnmatchcase(name, pattern):
+                if _fnmatch.filter(names, pattern):
                     return True
 
-        for name, function in members:
+        for function in sorted(functions, key=lambda x: line_number(x)):
+            name = function.__name__
+            full_name = "{0}:{1}".format(self.name, name)
+            short_name = name[5:]
+            names = [name, full_name, short_name]
+
             if not is_test_function(name):
                 continue
 
-            if not included(name):
-                self.command.info("Skipping test '{0}:{1}' (not included)", self.module.__name__, name)
+            if not included(names):
+                self.command.info("Skipping test '{0}' (not included)", full_name)
                 continue
 
-            if excluded(name):
-                self.command.info("Skipping test '{0}:{1}' (excluded)", self.module.__name__, name)
+            if excluded(names):
+                self.command.info("Skipping test '{0}' (excluded)", full_name)
                 continue
 
             _TestFunction(self, function)
 
+    def list_tests(self):
+        for function in self.test_functions:
+            print("{0}:{1}".format(self.name, function.name))
+
     def run_tests(self, session):
-        if self.command.list_only:
-            for function in self.test_functions:
-                print(function)
-
-            return
-
         if not self.command.verbose:
             self.command.notice("Running tests from {0}", self)
 
@@ -331,6 +348,8 @@ class _TestModule(object):
                 self.close_function(session)
 
     def run_test(self, session, function):
+        session.tests.append(function)
+
         start_time = _time.time()
 
         if self.command.verbose:
@@ -342,6 +361,14 @@ class _TestModule(object):
             except KeyboardInterrupt:
                 raise
             except Exception as e:
+                if isinstance(e, TestSkipped):
+                    session.skipped_tests.append(function)
+
+                    self.command.notice("{0} SKIPPED ({1})", function, _elapsed_time(start_time))
+                    _traceback.print_exc()
+
+                    return
+
                 session.failed_tests.append(function)
 
                 if isinstance(e, TestTimedOut):
@@ -354,9 +381,10 @@ class _TestModule(object):
                 return
 
             session.passed_tests.append(function)
+
             self.command.notice("{0} PASSED ({1})", function, _elapsed_time(start_time))
         else:
-            self._print("{0:.<73} ".format(function.name + " "), end="")
+            self._print("{0:.<72} ".format(function.name + " "), end="")
 
             output_file = _tempfile.mkstemp(prefix="commandant-")[1]
 
@@ -368,28 +396,46 @@ class _TestModule(object):
             except KeyboardInterrupt:
                 raise
             except Exception as e:
+                if isinstance(e, TestSkipped):
+                    session.skipped_tests.append(function)
+
+                    self._print("SKIPPED {0:>6}".format(_elapsed_time(start_time)))
+                    self._print("Reason: {}".format(str(e)))
+
+                    return
+
                 session.failed_tests.append(function)
 
-                self._print("FAILED {0:>6}".format(_elapsed_time(start_time)))
+                self._print("FAILED  {0:>6}".format(_elapsed_time(start_time)))
+                self._print("--- Error ---")
 
                 if isinstance(e, TestTimedOut):
-                    print("Error! Test timed out")
+                    self._print("> Test timed out")
+                elif isinstance(e, _subprocess.CalledProcessError):
+                    self._print("> {}".format(str(e)))
                 else:
-                    _traceback.print_exc()
+                    lines = _traceback.format_exc().rstrip().split("\n")
+                    lines = ["> {}".format(x) for x in lines]
 
-                with open(output_file, "r") as out:
-                    for line in out:
-                        _sys.stderr.write("> ")
-                        _sys.stderr.write(line)
+                    self._print("\n".join(lines))
 
-                _sys.stderr.flush()
+                self._print("--- Output ---")
+
+                if not self.command.quiet:
+                    with open(output_file, "r") as out:
+                        for line in out:
+                            _sys.stdout.write("> ")
+                            _sys.stdout.write(line)
+
+                    _sys.stdout.flush()
 
                 return
             finally:
                 _os.remove(output_file)
 
             session.passed_tests.append(function)
-            self._print("PASSED {0:>6}".format(_elapsed_time(start_time)))
+
+            self._print("PASSED  {0:>6}".format(_elapsed_time(start_time)))
 
     def _print(self, *args, **kwargs):
         if self.command.quiet:
@@ -409,6 +455,18 @@ def _elapsed_time(start_time):
         return "{0:.0f}s".format(elapsed)
 
     return "{0:.1f}s".format(elapsed)
+
+def _plural(noun, count=0):
+    if noun is None:
+        return ""
+
+    if count == 1:
+        return noun
+
+    if noun.endswith("s"):
+        return "{}ses".format(noun)
+
+    return "{}s".format(noun)
 
 class _OutputRedirected(object):
     def __init__(self, stdout=None, stderr=None):
