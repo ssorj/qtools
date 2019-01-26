@@ -221,9 +221,9 @@ class TestCommand(Command):
             self.fail("No tests ran");
 
         if failed == 0:
-            print("RESULT: All tests passed ({} skipped)".format(skipped))
+            print("RESULT: All tests passed ({0} skipped)".format(skipped))
         else:
-            print("RESULT: {} {} failed ({} skipped)".format \
+            print("RESULT: {0} {1} failed ({2} skipped)".format \
                   (failed, _plural("test", failed), skipped))
             _sys.exit(1)
 
@@ -400,7 +400,7 @@ class _TestModule(object):
                     session.skipped_tests.append(function)
 
                     self._print("SKIPPED {0:>6}".format(_elapsed_time(start_time)))
-                    self._print("Reason: {}".format(str(e)))
+                    self._print("Reason: {0}".format(str(e)))
 
                     return
 
@@ -412,10 +412,10 @@ class _TestModule(object):
                 if isinstance(e, TestTimedOut):
                     self._print("> Test timed out")
                 elif isinstance(e, _subprocess.CalledProcessError):
-                    self._print("> {}".format(str(e)))
+                    self._print("> {0}".format(str(e)))
                 else:
                     lines = _traceback.format_exc().rstrip().split("\n")
-                    lines = ["> {}".format(x) for x in lines]
+                    lines = ["> {0}".format(x) for x in lines]
 
                     self._print("\n".join(lines))
 
@@ -464,9 +464,9 @@ def _plural(noun, count=0):
         return noun
 
     if noun.endswith("s"):
-        return "{}ses".format(noun)
+        return "{0}ses".format(noun)
 
-    return "{}s".format(noun)
+    return "{0}s".format(noun)
 
 class _OutputRedirected(object):
     def __init__(self, stdout=None, stderr=None):
