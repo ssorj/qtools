@@ -47,7 +47,8 @@ class Broker(object):
         if self.id is None:
             self.id = "broker-{0}".format(_uuid.uuid4())
 
-        self.container = _reactor.Container(_Handler(self), self.id)
+        self.container = _reactor.Container(_Handler(self))
+        self.container.container_id = self.id # XXX Obnoxious
 
         self._config_dir = None
 
