@@ -71,32 +71,32 @@ big-test: test test-centos test-centos-6 test-fedora test-ubuntu test-ubuntu-xen
 
 .PHONY: test-centos
 test-centos:
-	sudo docker build -f scripts/test-centos.dockerfile -t ${USER}/qtools-test-centos --build-arg CACHE_BUST=$${RANDOM} .
+	sudo docker build -f scripts/test-centos.dockerfile -t ${USER}/qtools-test-centos .
 	sudo docker run --rm ${USER}/qtools-test-centos
 
 .PHONY: test-centos-6
 test-centos-6:
-	sudo docker build -f scripts/test-centos-6.dockerfile -t ${USER}/qtools-test-centos-6 --build-arg CACHE_BUST=$${RANDOM} .
+	sudo docker build -f scripts/test-centos-6.dockerfile -t ${USER}/qtools-test-centos-6 .
 	sudo docker run --rm ${USER}/qtools-test-centos-6
 
 .PHONY: test-fedora
 test-fedora:
-	sudo docker build -f scripts/test-fedora.dockerfile -t ${USER}/qtools-test-fedora --build-arg CACHE_BUST=$${RANDOM} .
+	sudo docker build -f scripts/test-fedora.dockerfile -t ${USER}/qtools-test-fedora .
 	sudo docker run --rm ${USER}/qtools-test-fedora
 
 .PHONY: test-ubuntu
 test-ubuntu:
-	sudo docker build -f scripts/test-ubuntu.dockerfile -t ${USER}/qtools-test-ubuntu --build-arg CACHE_BUST=$${RANDOM} .
+	sudo docker build -f scripts/test-ubuntu.dockerfile -t ${USER}/qtools-test-ubuntu .
 	sudo docker run --rm ${USER}/qtools-test-ubuntu
 
 .PHONY: test-ubuntu-xenial
 test-ubuntu-xenial:
-	sudo docker build -f scripts/test-ubuntu-xenial.dockerfile -t ${USER}/qtools-test-ubuntu-xenial --build-arg CACHE_BUST=$${RANDOM} .
+	sudo docker build -f scripts/test-ubuntu-xenial.dockerfile -t ${USER}/qtools-test-ubuntu-xenial .
 	sudo docker run --rm ${USER}/qtools-test-ubuntu-xenial
 
 .PHONY: test-ubuntu-trusty
 test-ubuntu-trusty:
-	sudo docker build -f scripts/test-ubuntu-trusty.dockerfile -t ${USER}/qtools-test-ubuntu-trusty --build-arg CACHE_BUST=$${RANDOM} .
+	sudo docker build -f scripts/test-ubuntu-trusty.dockerfile -t ${USER}/qtools-test-ubuntu-trusty .
 	sudo docker run --rm ${USER}/qtools-test-ubuntu-trusty
 
 build/prefix.txt:

@@ -18,7 +18,6 @@
 #
 
 FROM ubuntu:xenial
-MAINTAINER Justin Ross <jross@apache.org>
 
 RUN apt-get -qq update && apt-get -qq -y upgrade
 
@@ -29,7 +28,6 @@ RUN apt-get -qq -y install software-properties-common \
 
 COPY . /root/qtools
 
-ARG CACHE_BUST=1
 RUN cd /root/qtools && make install PREFIX=/usr
 
 WORKDIR /root

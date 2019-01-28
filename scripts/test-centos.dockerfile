@@ -18,7 +18,6 @@
 #
 
 FROM centos
-MAINTAINER Justin Ross <jross@apache.org>
 
 RUN yum -q -y update && yum -q clean all
 
@@ -26,7 +25,6 @@ RUN yum -q -y install make python-qpid-proton && yum -q clean all
 
 COPY . /root/qtools
 
-ARG CACHE_BUST=1
 RUN cd /root/qtools && make install PREFIX=/usr
 
 WORKDIR /root

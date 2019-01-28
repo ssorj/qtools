@@ -26,7 +26,6 @@ RUN dnf -qy --setopt deltarpm=0 install findutils make python-qpid-proton && dnf
 
 COPY . /root/qtools
 
-ARG CACHE_BUST=1
 RUN cd /root/qtools && make install PREFIX=/usr
 
 WORKDIR /root
