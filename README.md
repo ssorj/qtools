@@ -175,4 +175,3 @@ it.  Usually you pipe it in, like this:
 This is a simple broker implementation that you can use for testing.
 
     qbroker [--host HOST] [--port PORT]
-
