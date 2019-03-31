@@ -275,6 +275,9 @@ class _Handler(_handlers.MessagingHandler):
         queue.store_message(delivery, message)
         queue.forward_messages()
 
+    def on_unhandled(self, name, event):
+        self.info("Unhandled event: {0} {1}", name, event)
+
 if __name__ == "__main__":
     def _print(message, *args):
         message = message.format(*args)
