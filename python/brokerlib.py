@@ -78,6 +78,9 @@ class Broker(object):
         except _subprocess.CalledProcessError as e:
             self.fail("Failed adding user to SASL database: {0}", e)
 
+    def debug(self, message, *args):
+        pass
+
     def info(self, message, *args):
         pass
 
@@ -276,7 +279,7 @@ class _Handler(_handlers.MessagingHandler):
         queue.forward_messages()
 
     def on_unhandled(self, name, event):
-        self.info("Unhandled event: {0} {1}", name, event)
+        self.broker.debug("Unhandled event: {0} {1}", name, event)
 
 if __name__ == "__main__":
     def _print(message, *args):
