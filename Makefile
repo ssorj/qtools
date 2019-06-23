@@ -29,8 +29,6 @@ export QTOOLS_HOME = ${CURDIR}/build/qtools
 export PATH := ${CURDIR}/build/bin:${PATH}
 export PYTHONPATH := ${QTOOLS_HOME}/python:${CURDIR}/python:${PYTHONPATH}
 
-VERSION := $(shell cat VERSION.txt)
-
 BIN_SOURCES := $(shell find bin -type f -name \*.in)
 BIN_TARGETS := ${BIN_SOURCES:%.in=build/%}
 
@@ -115,4 +113,4 @@ build/qtools/python/%: python/%
 
 .PHONY: update-%
 update-%:
-	curl "https://raw.githubusercontent.com/ssorj/$*/master/python/$*.py" -o python/$*.py
+	curl -sfo python/$*.py "https://raw.githubusercontent.com/ssorj/$*/master/python/$*.py"
