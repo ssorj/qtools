@@ -84,6 +84,8 @@ class MessagingCommand(_commandant.Command):
                           help="Prove your identity with SECRET")
         self.add_argument("--allowed-mechs", metavar="MECHS", default="anonymous,plain",
                           help="Restrict allowed SASL mechanisms to MECHS (default \"anonymous,plain\")")
+        self.add_argument("--ready-file", metavar="FILE",
+                          help="The file used to indicate the client is ready")
 
     def init(self):
         super(MessagingCommand, self).init()
@@ -102,6 +104,7 @@ class MessagingCommand(_commandant.Command):
         self.user = self.args.user
         self.password = self.args.password
         self.allowed_mechs = self.args.allowed_mechs.replace(",", " ").upper()
+        self.ready_file = self.args.ready_file
 
     def parse_address_url(self, address):
         url = _urlparse(address)
@@ -199,6 +202,10 @@ class LinkHandler(_handlers.MessagingHandler):
                                 event.connection)
 
         if self.opened_links == len(self.links):
+            if self.command.ready_file is not None:
+                with open(self.command.ready_file, "w") as f:
+                    f.write("ready\n")
+
             self.command.ready.set()
 
     def on_settled(self, event):

@@ -134,3 +134,23 @@ def test_message(session):
         send_and_receive(server.url, "--ttl 100.1")
         send_and_receive(server.url, "--body hello")
         send_and_receive(server.url, "--property x y --property a b")
+
+def test_ready_file(session):
+    def wait_for_ready(temp):
+            while True:
+                with open(temp) as f:
+                    if f.read() == "ready\n":
+                        break
+
+                sleep(0.2)
+
+    with TestServer() as server:
+        with temp_file() as temp:
+            proc = start_qsend(server.url, "--ready-file {0}".format(temp))
+            wait_for_ready(temp)
+            terminate_process(proc)
+
+        with temp_file() as temp:
+            proc = start_qreceive(server.url, "--ready-file {0}".format(temp))
+            wait_for_ready(temp)
+            terminate_process(proc)
