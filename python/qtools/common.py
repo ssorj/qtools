@@ -285,6 +285,8 @@ class _OutputThread(_InputOutputThread):
                     except IndexError:
                         break
 
+                    print("DEBUG:", line, file=_sys.stderr)
+
                     if line is DONE:
                         return
 
