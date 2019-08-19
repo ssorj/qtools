@@ -22,6 +22,7 @@
 DESTDIR := ""
 PREFIX := /usr/local
 INSTALLED_QTOOLS_HOME = ${PREFIX}/share/qtools
+PYTHON_EXECUTABLE := /usr/bin/python
 
 VIRTUALENV_ENABLED := 1
 
@@ -101,7 +102,7 @@ build/prefix.txt:
 	echo ${PREFIX} > build/prefix.txt
 
 build/bin/%: bin/%.in
-	scripts/configure-file -a qtools_home=${INSTALLED_QTOOLS_HOME} $< $@
+	scripts/configure-file -a qtools_home=${INSTALLED_QTOOLS_HOME} -a python_executable=${PYTHON_EXECUTABLE} $< $@
 
 build/qtools/python/qtools/%: python/qtools/% python/qtools/common.py python/brokerlib.py python/commandant.py python/plano.py
 	@mkdir -p ${@D}
