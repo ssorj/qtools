@@ -26,6 +26,15 @@ VIRTUALENV_ENABLED=$1
 qtools-test
 
 if hash virtualenv && (( $VIRTUALENV_ENABLED == 1 )); then
+    if hash python2; then
+        TEST_ENV_DIR=$(mktemp -d)
+        virtualenv $TEST_ENV_DIR -p /usr/bin/python2 --no-setuptools --no-pip --no-wheel --no-download --system-site-packages
+
+        (source $TEST_ENV_DIR/bin/activate && qtools-test)
+
+        rm -rf $TEST_ENV_DIR
+    fi
+
     if hash python3; then
         TEST_ENV_DIR=$(mktemp -d)
         virtualenv $TEST_ENV_DIR -p /usr/bin/python3 --no-setuptools --no-pip --no-wheel --no-download --system-site-packages
