@@ -166,12 +166,10 @@ class LinkHandler(_handlers.MessagingHandler):
 
             self.command.info("Connecting to {0}", connection_url)
 
-            allowed_mechs = self.command.allowed_mechs.encode("ascii")
-
             connection = event.container.connect(connection_url,
                                                  user=self.command.user,
                                                  password=self.command.password,
-                                                 allowed_mechs=allowed_mechs)
+                                                 allowed_mechs=self.command.allowed_mechs)
 
             links = self.open_links(event, connection, address)
 
@@ -355,8 +353,7 @@ def process_input_line(line):
         data = _json.loads(line)
         message = convert_data_to_message(data)
     else:
-        body = line.decode()
-        message = _proton.Message(body)
+        message = _proton.Message(line)
 
     return message
 

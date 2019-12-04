@@ -67,7 +67,7 @@ class _DrainHandler(_handlers.MessagingHandler):
         host, port, path = parse_address_url(self.command.address)
         domain = "{}:{}".format(host, port)
 
-        conn = event.container.connect(domain, allowed_mechs=b"ANONYMOUS")
+        conn = event.container.connect(domain, allowed_mechs="ANONYMOUS")
         event.container.create_receiver(conn, path)
 
         self.command.notice("Created receiver for source address '{}'", path)
