@@ -66,7 +66,7 @@ test: build
 	scripts/test ${VIRTUALENV_ENABLED}
 
 .PHONY: big-test
-big-test: test test-centos-7 test-centos-6 test-fedora test-ubuntu test-ubuntu-xenial
+big-test: test test-fedora test-centos test-centos-7 test-centos-6 test-ubuntu test-ubuntu-xenial test-ubuntu-trusty
 
 .PHONY: test-centos
 test-centos:
