@@ -66,12 +66,17 @@ test: build
 	scripts/test ${VIRTUALENV_ENABLED}
 
 .PHONY: big-test
-big-test: test test-centos test-centos-6 test-fedora test-ubuntu test-ubuntu-xenial
+big-test: test test-centos-7 test-centos-6 test-fedora test-ubuntu test-ubuntu-xenial
 
 .PHONY: test-centos
 test-centos:
 	sudo docker build -f scripts/test-centos.dockerfile -t ${USER}/qtools-test-centos .
 	sudo docker run --rm ${USER}/qtools-test-centos
+
+.PHONY: test-centos-7
+test-centos-7:
+	sudo docker build -f scripts/test-centos-7.dockerfile -t ${USER}/qtools-test-centos-7 .
+	sudo docker run --rm ${USER}/qtools-test-centos-7
 
 .PHONY: test-centos-6
 test-centos-6:

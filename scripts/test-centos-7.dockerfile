@@ -17,15 +17,15 @@
 # under the License.
 #
 
-FROM fedora
-MAINTAINER Justin Ross <jross@apache.org>
+FROM centos:7
 
-RUN dnf -qy --setopt deltarpm=0 update && dnf -q clean all
-RUN dnf -qy --setopt deltarpm=0 install findutils make python2 python3-qpid-proton && dnf -q clean all
+RUN yum -q -y update && yum -q clean all
+
+RUN yum -q -y install make python-qpid-proton && yum -q clean all
 
 COPY . /root/qtools
 
-RUN cd /root/qtools && make install PYTHON_EXECUTABLE=/usr/bin/python3 PREFIX=/usr
+RUN cd /root/qtools && make install PREFIX=/usr
 
 WORKDIR /root
 CMD ["qtools-test"]

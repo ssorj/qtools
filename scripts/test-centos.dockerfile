@@ -19,13 +19,13 @@
 
 FROM centos
 
-RUN yum -q -y update && yum -q clean all
-
-RUN yum -q -y install make python-qpid-proton && yum -q clean all
+RUN dnf -qy --setopt deltarpm=0 update && dnf -q clean all
+RUN dnf -qy --setopt deltarpm=0 install epel-release && dnf -q clean all
+RUN dnf -qy --setopt deltarpm=0 install make python2 python3-qpid-proton && dnf -q clean all
 
 COPY . /root/qtools
 
-RUN cd /root/qtools && make install PREFIX=/usr
+RUN cd /root/qtools && make install PYTHON_EXECUTABLE=/usr/bin/python3 PREFIX=/usr
 
 WORKDIR /root
 CMD ["qtools-test"]
