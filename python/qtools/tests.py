@@ -21,6 +21,7 @@ from plano import *
 
 def open_test_session(session):
     enable_logging(level="error")
+    session.test_timeout = 10
 
 def start_qmessage(args, **kwargs):
     return start_process("qmessage --verbose {0}", args, **kwargs)
