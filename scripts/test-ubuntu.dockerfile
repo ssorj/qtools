@@ -24,11 +24,11 @@ RUN apt-get -qq update && apt-get -qq -y upgrade
 RUN apt-get -qq -y install software-properties-common \
     && add-apt-repository -y ppa:qpid/released \
     && apt-get -qq update \
-    && apt-get -qq -y install make python-qpid-proton
+    && apt-get -qq -y install make python python3-qpid-proton
 
 COPY . /root/qtools
 
-RUN cd /root/qtools && make install PREFIX=/usr
+RUN cd /root/qtools && make install PYTHON_EXECUTABLE=/usr/bin/python3 PREFIX=/usr
 
 WORKDIR /root
 CMD ["qtools-test"]
