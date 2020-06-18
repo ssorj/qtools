@@ -208,7 +208,7 @@ class _Handler(_handlers.MessagingHandler):
                 address = "{0}/{1}".format(event.connection.remote_container, event.link.name)
                 queue = self.create_queue(address)
             elif event.link.remote_source.address in (None, ""):
-                raise Exception("Not sure what this case is")
+                raise Exception("The client created a receiver with no source address")
             else:
                 # A named queue
                 address = event.link.remote_source.address
