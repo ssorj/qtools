@@ -54,6 +54,8 @@ def send_and_receive(url, qmessage_args="", qsend_args="", qreceive_args="--coun
 
         raise
 
+    receive_proc.stdout.flush() # XXX Hack to see if this fixes periodic empty string output
+
     output = receive_proc.communicate()[0].decode()
 
     return output[:-1]
