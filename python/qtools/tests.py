@@ -76,7 +76,7 @@ def request_and_respond(url, qmessage_args="", qrequest_args="", qrespond_args="
 
         raise
 
-    receive_proc.stdout.flush() # XXX Hack to see if this fixes periodic empty string output
+    request_proc.stdout.flush() # XXX Hack to see if this fixes periodic empty string output
 
     output = request_proc.communicate()[0].decode()
 
