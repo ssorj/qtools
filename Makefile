@@ -69,7 +69,7 @@ test: build
 big-test: test os-tests
 
 .PHONY: os-tests
-os-tests: test-fedora test-centos test-centos-7 test-centos-6 test-ubuntu test-ubuntu-xenial test-ubuntu-trusty
+os-tests: test-fedora test-centos test-ubuntu
 
 .PHONY: test-centos
 test-centos:

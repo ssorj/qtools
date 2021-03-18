@@ -17,11 +17,10 @@
 # under the License.
 #
 
-FROM fedora
-MAINTAINER Justin Ross <jross@apache.org>
+FROM registry.fedoraproject.org/fedora
 
-RUN dnf -qy --setopt deltarpm=0 update && dnf -q clean all
-RUN dnf -qy --setopt deltarpm=0 install findutils make python2 python3-qpid-proton && dnf -q clean all
+RUN dnf -qy update && dnf -q clean all
+RUN dnf -y install findutils make python2 python3-qpid-proton && dnf -q clean all
 
 COPY . /root/qtools
 

@@ -17,7 +17,7 @@
 # under the License.
 #
 
-FROM centos
+FROM quay.io/centos/centos
 
 RUN dnf -qy --setopt deltarpm=0 update && dnf -q clean all
 RUN dnf -qy --setopt deltarpm=0 install epel-release && dnf -q clean all
