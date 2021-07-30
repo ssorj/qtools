@@ -22,7 +22,7 @@
 DESTDIR := ""
 PREFIX := /usr/local
 INSTALLED_QTOOLS_HOME = ${PREFIX}/share/qtools
-PYTHON_EXECUTABLE := /usr/bin/python
+PYTHON_EXECUTABLE := /usr/bin/python3
 
 VIRTUALENV_ENABLED := 1
 

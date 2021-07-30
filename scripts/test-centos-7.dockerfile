@@ -21,7 +21,7 @@ FROM centos:7
 
 RUN yum -q -y update && yum -q clean all
 RUN yum -q -y install epel-release && yum -q clean all
-RUN yum -q -y install make python-qpid-proton && yum -q clean all
+RUN yum -q -y install make python3-qpid-proton && yum -q clean all
 
 COPY . /root/qtools
 
