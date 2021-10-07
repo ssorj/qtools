@@ -25,8 +25,7 @@ default_home = os.path.normpath("@qtools_home@")
 home = os.environ.get("QTOOLS_HOME", default_home)
 sys.path.insert(0, os.path.join(home, "python"))
 
-from qtools.broker import BrokerCommand
+from brokerlib import main
 
 if __name__ == "__main__":
-    command = BrokerCommand(home)
-    command.main()
+    main()
