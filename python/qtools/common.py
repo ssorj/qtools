@@ -76,14 +76,20 @@ class MessagingCommand(_commandant.Command):
                           help="The location of a message source or target")
         self.add_argument("--server", metavar="HOST[:PORT]", default="127.0.0.1:5672",
                           help="Use HOST[:PORT] as the default server (default 127.0.0.1:5672)")
-        self.add_argument("--tls", action="store_true",
-                          help="Connect using SSL/TLS authentication and encryption")
         self.add_argument("--user", metavar="USER",
                           help="Identify as USER")
         self.add_argument("--password", metavar="SECRET",
                           help="Prove your identity with SECRET")
         self.add_argument("--allowed-mechs", metavar="MECHS", default="anonymous,plain",
                           help="Restrict allowed SASL mechanisms to MECHS (default \"anonymous,plain\")")
+        self.add_argument("--tls", action="store_true",
+                          help="Connect using TLS authentication and encryption")
+        self.add_argument("--cert", metavar="FILE",
+                          help="The TLS certificate file")
+        self.add_argument("--key", metavar="FILE",
+                          help="The TLS private key file")
+        self.add_argument("--trust", metavar="FILE",
+                          help="Trust CA certificates in FILE")
         self.add_argument("--ready-file", metavar="FILE",
                           help="The file used to indicate the client is ready")
 
@@ -100,11 +106,23 @@ class MessagingCommand(_commandant.Command):
     def init_link_attributes(self):
         self.urls = self.args.url
         self.server = self.args.server
-        self.tls_enabled = self.args.tls
         self.user = self.args.user
         self.password = self.args.password
         self.allowed_mechs = self.args.allowed_mechs.replace(",", " ").upper()
+        self.tls = self.args.tls
+        self.cert = self.args.cert
+        self.key = self.args.key
+        self.trust = self.args.trust
         self.ready_file = self.args.ready_file
+
+        if self.cert and not _os.path.exists(self.cert):
+            self.fail("Cert file not found")
+
+        if self.key and not _os.path.exists(self.key):
+            self.fail("Key file not found")
+
+        if self.trust and not _os.path.exists(self.trust):
+            self.fail("Trust file not found")
 
     def parse_address_url(self, address):
         url = _urlparse(address)
@@ -117,7 +135,7 @@ class MessagingCommand(_commandant.Command):
         port = url.port
         path = url.path
 
-        default_scheme = "amqps" if self.tls_enabled else "amqp"
+        default_scheme = "amqps" if self.tls else "amqp"
 
         try:
             default_host, default_port = self.server.split(":", 1)
@@ -163,13 +181,27 @@ class LinkHandler(_handlers.MessagingHandler):
         for url in self.command.urls:
             scheme, host, port, address = self.command.parse_address_url(url)
             connection_url = "{0}://{1}:{2}".format(scheme, host, port)
+            ssl_domain = None
+
+            if self.command.tls or scheme == "amqps":
+                ssl_domain = _proton.SSLDomain(_proton.SSLDomain.MODE_CLIENT)
+
+                if self.command.cert:
+                    ssl_domain.set_credentials(self.command.cert, self.command.key, None)
+
+                if self.command.trust is not None:
+                    ssl_domain.set_peer_authentication(_proton.SSLDomain.VERIFY_PEER, self.command.trust)
+                    ssl_domain.set_trusted_ca_db(self.command.trust)
+                else:
+                    ssl_domain.set_peer_authentication(_proton.SSLDomain.VERIFY_PEER_NAME)
 
             self.command.info("Connecting to {0}", connection_url)
 
             connection = event.container.connect(connection_url,
                                                  user=self.command.user,
                                                  password=self.command.password,
-                                                 allowed_mechs=self.command.allowed_mechs)
+                                                 allowed_mechs=self.command.allowed_mechs,
+                                                 ssl_domain=ssl_domain)
 
             links = self.open_links(event, connection, address)
 

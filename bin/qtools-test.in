@@ -30,5 +30,5 @@ import qtools.tests
 from commandant import TestCommand
 
 if __name__ == "__main__":
-    command = TestCommand([qtools.tests])
+    command = TestCommand([qtools.tests], home=home)
     command.main()

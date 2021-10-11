@@ -32,19 +32,21 @@ import tempfile as _tempfile
 class Broker:
     def __init__(self, host, port, id=None, ready_file=None,
                  user=None, password=None,
-                 cert=None, key=None, trust_store=None,
-                 quiet=False, verbose=False, init_only=False):
+                 cert=None, key=None, trust=None,
+                 quiet=False, verbose=False, debug_enabled=False,
+                 init_only=False):
         self.host = host
         self.port = port
         self.id = id
+        self.ready_file = ready_file
         self.user = user
         self.password = password
-        self.ready_file = ready_file
         self.cert = cert
         self.key = key
-        self.trust_store = trust_store
+        self.trust = trust
         self.quiet = quiet
         self.verbose = verbose
+        self.debug_enabled = debug_enabled
         self.init_only = init_only
 
         if self.id is None:
@@ -53,9 +55,14 @@ class Broker:
         self.container = _reactor.Container(_Handler(self))
         self.container.container_id = self.id # XXX Obnoxious
 
+        if self.debug_enabled:
+            self.verbose = True
+
         self._config_dir = None
 
     def init(self):
+        self.info("Initializing {0}", self)
+
         if self.user is not None:
             if self.password is None:
                 self.fail("A password is required for user authentication")
@@ -66,14 +73,14 @@ class Broker:
             if self.key is None:
                 self.fail("Both the cert and key files must be provided")
 
-            if not _os.path.isfile(self.key):
-                self.fail("Private key file {0} does not exist", self.key)
-
             if not _os.path.isfile(self.cert):
                 self.fail("Certificate file {0} does not exist", self.cert)
 
-            if self.trust_store and not _os.path.isfile(self.trust_store):
-                self.fail("Trust store file {0} does not exist", self.trust_store)
+            if not _os.path.isfile(self.key):
+                self.fail("Private key file {0} does not exist", self.key)
+
+            if self.trust and not _os.path.isfile(self.trust):
+                self.fail("Trust file {0} does not exist", self.trust)
 
     def _init_sasl_config(self):
         self._config_dir = _tempfile.mkdtemp(prefix="brokerlib-", suffix="")
@@ -205,15 +212,16 @@ class _Handler(_handlers.MessagingHandler):
         interface = "{0}:{1}".format(self.broker.host, self.broker.port)
 
         if self.broker.cert is not None:
-            server_ssl_domain = event.container.ssl.server
-            server_ssl_domain.set_credentials(self.broker.cert, self.broker.key, None)
+            interface = "amqps://{0}".format(interface)
 
-            if self.broker.trust_store:
-                server_ssl_domain.set_trusted_ca_db(self.broker.trust_store)
-                server_ssl_domain.set_peer_authentication(_proton.SSLDomain.VERIFY_PEER_NAME,
-                                                          self.broker.trust_store)
+            ssl_domain = event.container.ssl.server
+            ssl_domain.set_credentials(self.broker.cert, self.broker.key, None)
+
+            if self.broker.trust:
+                ssl_domain.set_peer_authentication(_proton.SSLDomain.VERIFY_PEER, self.broker.trust)
+                ssl_domain.set_trusted_ca_db(self.broker.trust)
             else:
-                server_ssl_domain.set_peer_authentication(_proton.SSLDomain.ANONYMOUS_PEER)
+                ssl_domain.set_peer_authentication(_proton.SSLDomain.ANONYMOUS_PEER)
 
         self.acceptor = event.container.listen(interface)
 
@@ -388,28 +396,33 @@ def main():
     parser.add_argument("--ready-file", metavar="FILE",
                         help="The file used to indicate the server is ready")
     # parser.add_argument("--user", metavar="USER",
-    #                   help="Require USER")
+    #                     help="Require USER")
     # parser.add_argument("--password", metavar="SECRET",
-    #                   help="Require SECRET")
+    #                     help="Require SECRET")
+    # parser.add_argument("--allowed-mechs", metavar="MECHS", default="anonymous,plain",
+    #                     help="Restrict allowed SASL mechanisms to MECHS (default \"anonymous,plain\")")
     parser.add_argument("--cert", metavar="FILE",
-                        help="The TLS certificate file")
+                        help="The TLS certificate file.  "
+                        "If set, TLS is enabled and you must also set --key.")
     parser.add_argument("--key", metavar="FILE",
                         help="The TLS private key file")
-    parser.add_argument("--trust-store", metavar="FILE",
+    parser.add_argument("--trust", metavar="FILE",
                         help="The file containing trusted client certificates.  "
                         "If set, the server verifies client certificates.")
     parser.add_argument("--quiet", action="store_true",
                         help="Print no logging to the console")
     parser.add_argument("--verbose", action="store_true",
                         help="Print detailed logging to the console")
+    parser.add_argument("--debug", action="store_true",
+                        help="Print debugging output")
     parser.add_argument("--init-only", action="store_true",
-                      help=argparse.SUPPRESS)
+                        help=argparse.SUPPRESS)
 
     args = parser.parse_args()
 
     class _Broker(Broker):
         def debug(self, message, *args):
-            if self.verbose:
+            if self.debug_enabled:
                 self.log(message, *args)
 
         def info(self, message, *args):
@@ -429,9 +442,10 @@ def main():
             self.log(message, *args)
 
     broker = _Broker(args.host, args.port, id=args.id, ready_file=args.ready_file,
-                     # user=args.user, password=args.password,
-                     cert=args.cert, key=args.key, trust_store=args.trust_store,
-                     quiet=args.quiet, verbose=args.verbose, init_only=args.init_only)
+                     # user=args.user, password=args.password, allowed_mechs=args.allowed_mechs,
+                     cert=args.cert, key=args.key, trust=args.trust,
+                     quiet=args.quiet, verbose=args.verbose, debug_enabled=args.debug,
+                     init_only=args.init_only)
 
     try:
         broker.run()

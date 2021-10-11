@@ -36,6 +36,9 @@ BIN_TARGETS := ${BIN_SOURCES:%.in=build/%}
 PYTHON_SOURCES := $(shell find python -type f -name \*.py)
 PYTHON_TARGETS := ${PYTHON_SOURCES:%=build/qtools/%} ${PYTHON_SOURCES:%.in=build/qtools/%}
 
+TEST_CERT_SOURCES := $(shell find test-certs -type f -name \*.pem)
+TEST_CERT_TARGETS := ${TEST_CERT_SOURCES:%=build/qtools/%} ${TEST_CERT_SOURCES:%.in=build/qtools/%}
+
 .PHONY: default
 default: build
 
@@ -53,7 +56,7 @@ clean:
 	rm -rf build
 
 .PHONY: build
-build: ${BIN_TARGETS} ${PYTHON_TARGETS} build/prefix.txt
+build: ${BIN_TARGETS} ${PYTHON_TARGETS} ${TEST_CERT_TARGETS} build/prefix.txt
 	scripts/smoke-test
 
 .PHONY: install
@@ -117,6 +120,10 @@ build/qtools/python/qtools/%: python/qtools/% python/qtools/common.py python/bro
 	cp $< $@
 
 build/qtools/python/%: python/%
+	@mkdir -p ${@D}
+	cp $< $@
+
+build/qtools/test-certs/%: test-certs/%
 	@mkdir -p ${@D}
 	cp $< $@
 

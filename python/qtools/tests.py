@@ -47,7 +47,7 @@ def send_and_receive(url, qmessage_args="", qsend_args="", qreceive_args="--coun
         check_process(message_proc)
         check_process(send_proc)
         check_process(receive_proc)
-    except CalledProcessError:
+    except:
         terminate_process(message_proc)
         terminate_process(send_proc)
         terminate_process(receive_proc)
@@ -69,7 +69,7 @@ def request_and_respond(url, qmessage_args="", qrequest_args="", qrespond_args="
         check_process(message_proc)
         check_process(request_proc)
         check_process(respond_proc)
-    except CalledProcessError:
+    except:
         terminate_process(message_proc)
         terminate_process(request_proc)
         terminate_process(respond_proc)
@@ -83,18 +83,14 @@ def request_and_respond(url, qmessage_args="", qrequest_args="", qrespond_args="
     return output[:-1]
 
 class TestServer(object):
-    def __init__(self, user=None, password=None):
+    def __init__(self, **extra_args):
         port = random_port()
 
-        if user is None:
-            assert password is None
-            self.proc = start_process("qbroker --verbose --port {0}", port)
-        else:
-            assert password is not None
-            self.proc = start_process("qbroker --verbose --port {0} --user {1} --password {2}",
-                                      port, user, password)
+        args = " ".join(["--{} {}".format(k, v) for k, v in extra_args.items()])
 
-        self.proc.url = "//127.0.0.1:{0}/q0".format(port)
+        self.proc = start_process("qbroker --verbose --port {} {}", port, args)
+
+        self.proc.url = "//localhost:{0}/q0".format(port)
 
     def __enter__(self):
         return self.proc
@@ -159,3 +155,22 @@ def test_ready_file(session):
             proc = start_qreceive(server.url, "--ready-file {0}".format(temp))
             wait_for_ready(temp)
             terminate_process(proc)
+
+def test_tls(session):
+    cert_dir = join(session.module.command.home, "test-certs")
+    server_cert = join(cert_dir, "server-cert.pem")
+    server_key = join(cert_dir, "server-key.pem")
+    client_cert = join(cert_dir, "client-cert.pem")
+    client_key = join(cert_dir, "client-key.pem")
+
+    with TestServer(cert=server_cert, key=server_key) as server:
+        client_args = "--tls --trust {}".format(server_cert)
+        qreceive_args = "{} --count 1".format(client_args)
+
+        send_and_receive(server.url, qsend_args=client_args, qreceive_args=qreceive_args)
+
+    with TestServer(cert=server_cert, key=server_key, trust=client_cert) as server:
+        client_args = "--tls --cert {} --key {} --trust {}".format(client_cert, client_key, server_cert)
+        qreceive_args = "{} --count 1".format(client_args)
+
+        send_and_receive(server.url, qsend_args=client_args, qreceive_args=qreceive_args)
