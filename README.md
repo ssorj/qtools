@@ -1,60 +1,24 @@
 # Qtools
 
-[![Build Status](https://travis-ci.org/ssorj/qtools.svg?branch=master)](https://travis-ci.org/ssorj/qtools)
+[![main](https://github.com/ssorj/qtools/workflows/main/badge.svg)](https://github.com/ssorj/qtools/actions?query=workflow%3Amain)
 
-    $ qreceive amqp://example.net/queue1 --count 1 &
-    $ qsend amqp://example.net/queue1 --message hello
+    $ qsend amqp://example.net/queue1 hello
+    $ qreceive amqp://example.net/queue1 --count 1
+    hello
 
-    $ qrespond amqp://example.net/requests &
-    $ qrequest amqp://example.net/requests < requests.txt
+    $ qrespond amqp://example.net/requests --upper &
+    $ qrequest amqp://example.net/requests hello
+    HELLO
 
     $ qmessage --count 10 | qsend amqp://example.net/queue1
     $ qmessage --rate 1 | qrequest amqp://example.net/requests
 
 ## Installation
 
-For more ways to build and use Docker images and packages, see
-[the packaging README](packaging).
-
 ### Dependencies
 
- - findutils
- - make
- - python-qpid-proton
  - python3-qpid-proton
- - python-argparse (required only on RHEL 6)
- - virtualenv (for testing)
-
-### Using Docker
-
-    $ sudo docker run -it ssorj/qtools
-
-### Installing on Fedora
-
-    $ sudo dnf install dnf-plugins-core
-    $ sudo dnf copr enable jross/ssorj
-    $ sudo dnf install qtools
-
-If you don't have `dnf`, use the repo files at
-<https://copr.fedorainfracloud.org/coprs/jross/ssorj/>.
-
-### Installing on RHEL 7
-
-    $ cd /etc/yum.repos.d && sudo wget https://copr.fedorainfracloud.org/coprs/jross/ssorj/repo/epel-7/jross-ssorj-epel-7.repo
-    $ sudo yum install qtools
-
-### Installing on Ubuntu
-
-Qtools requires a newer version of python-qpid-proton than Ubuntu
-provides by default.  Use these commands to install it from an Ubuntu
-PPA.
-
-    $ sudo apt-get install software-properties-common
-    $ sudo add-apt-repository ppa:qpid/released
-    $ sudo apt-get update
-    $ sudo apt-get install make python-qpid-proton
-
-After this you can install from source.
+ - python3-distutils
 
 ### Installing from source
 
@@ -62,107 +26,103 @@ By default, installs from source go to `$HOME/.local`.  Make sure
 `$HOME/.local/bin` is in your path.
 
     $ cd quiver/
-    $ make install
+    $ ./plano install
 
-Use the `PREFIX` option to change the install location.
+Use the `--prefix` option to change the install location.
 
-    $ sudo make install PREFIX=/usr/local
+    $ sudo ./plano install --prefix /usr/local
 
 ## Command-line interface
 
 ### Common arguments
 
-The core commands take one or more URLs.  These indicate the location
-of a message source or target, such as a queue or topic.
+The messaging commands take a URL indicating the location of a message
+source or target, such as a queue or topic.
 
-    qsend ADDRESS-URL [ADDRESS-URL ...]
+    qsend URL [MESSAGE ...]
 
-An address URL has optional scheme and server parts.  The default
-scheme is 'amqp', and the default server is '127.0.0.1:5672'.  You
-can use the `--server` option to change the default server.
+A URL has optional scheme, host, and port parts.  The default scheme
+is `amqp`, and the default host and port are `localhost:5672`.
 
-    [SCHEME:][//SERVER/]ADDRESS
+    [SCHEME:][//HOST[:PORT]/]ADDRESS
 
-The send and request commands take message content on standard input
-(one message per line) or via the `--message` option.  The `--message`
-option can be repeated.
+The send and request commands take message content from the optional
+`MESSAGE` arguments (one message per argument) or from standard input
+or a file (one message per line).
 
 The receive and respond commands run forever unless you use the
 `--count` option to tell them to stop after processing a given number
-of messages or requests.
+of messages.
 
-Tools that read from or write to the console take the following
-options:
+Tools that read messages from or write messages to the console take
+the following options:
 
-    --input FILE          Read input from FILE
-    --output FILE         Write output to FILE
+    --input FILE          Read messages from FILE
+    --output FILE         Write messages to FILE
 
 With a few exceptions, all the tools share these options:
 
-    -h, --help            Print help output
-    --verbose             Print detailed logging
-    --quiet               Print no logging
+    -h, --help            Show this help message and exit
+    --version             Print the Qtools version and exit
+    --quiet               Print no logging to the console
+    --verbose             Print detailed logging to the console
+    --debug               Print debugging output to the console
 
-### The `qsend` and `qreceive` commands
+### The qconnect command
 
-These commands perform one-way message transfers.
+This command is for testing connections to AMQP servers.  It only
+connects (or fails to connect).  It doesn't transfer any messages.
 
-    qsend URL [URLS] [OPTIONS] [< messages.txt]
-    qreceive URL [URLS] [OPTIONS] [> messages.txt]
-
-    qsend URL --message MESSAGE
-
-    qreceive URL --count 1
-    -> MESSAGE
-
-The send command reads messages, one per line, from standard input.
-Alternatively, you can input messages using the `--message` option.
-The receive command prints each message it receives to standard
-output.
+    qconnect [OPTIONS] [URL]
 
 Typical usage:
 
-    $ qsend amqp://example.net/queue1 --message m1 &
-    $ qreceive amqp://example.net/queue1
-    queue1: m1
+    $ qbroker &
+    $ qconnect --verbose
+    qconnect-21511c30: Connecting to amqp://localhost:5672
+    qconnect-21511c30: Connected to server 'broker-dec74e10'
 
-### The `qrequest` and `qrespond` commands
+    $ qbroker --cert cert.pem --key key.pem &
+    $ qconnect --tls
+
+    $ qconnect --user alice --password secret amqps://example.net
+
+### The qsend and qreceive commands
+
+These commands perform one-way message transfers.
+
+    qsend [OPTIONS] URL [MESSAGE ...] [< messages.txt]
+    qreceive [OPTIONS] URL [URLS] [> messages.txt]
+
+Typical usage:
+
+    $ qbroker &
+    $ qsend amqp://localhost/queue1 message1
+    $ qreceive amqp://localhost/queue1 --count 1
+    message1
+
+### The qrequest and qrespond commands
 
 The request command sends a request and waits for a response.  The
 respond command listens for requests, processes them, and sends
 responses.
 
-    qrequest URL [URLS] [OPTIONS] [< requests.txt] [> responses.txt]
-    qrespond URL [URLS] [OPTIONS]
-
-    qrequest URL --message REQUEST
-    -> RESPONSE
-
-    qrespond URL --count 1
-
-The request command reads request messages from standard input and
-writes responses to standard output.
+    qrequest [OPTIONS] URL [MESSAGE ...] [< requests.txt] [> responses.txt]
+    qrespond [OPTIONS] URL
 
 Typical usage:
 
-    $ qrespond amqp://example.net/jobs --upper &
-    $ qrequest amqp://example.net/jobs --message abc
-    ABC
+    $ qbroker &
+    $ qrespond amqp://localhost/jobs --upper --reverse &
+    $ qrequest amqp://localhost/jobs abc
+    CBA
 
-### The `qmessage` command
+### The qmessage command
 
-This command generates message content for use by the `qsend` and
+This command generates message inputs for use by the `qsend` and
 `qrequest` tools.
 
     qmessage [OPTIONS] | {qsend,qrequest}
-
-    qmessage --id ID --body CONTENT
-    -> MESSAGE
-
-    qmessage --count 3
-    -> MESSAGE
-    -> MESSAGE
-    -> MESSAGE
 
 The output is in JSON format.  The send and request tools can consume
 it.  Usually you pipe it in, like this:
@@ -170,7 +130,7 @@ it.  Usually you pipe it in, like this:
     $ qmessage | qsend queue1
     $ qmessage --rate 1 | qrequest amqp://example.net/jobs
 
-### The `qbroker` command
+### The qbroker command
 
 This is a simple broker implementation that you can use for testing.
 

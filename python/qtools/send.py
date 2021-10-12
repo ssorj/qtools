@@ -17,85 +17,92 @@
 # under the License.
 #
 
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import print_function
-from __future__ import unicode_literals
-from __future__ import with_statement
-
-import collections as _collections
+import argparse as _argparse
 import proton as _proton
 import proton.reactor as _reactor
 import sys as _sys
-import threading as _threading
 
 from .common import *
 
-_description = "Send AMQP messages"
+_description = """
+Send AMQP messages.  Use qsend in combination with the qreceive
+command to transfer messages through an AMQP message server.
+"""
 
 _epilog = """
-example usage:
-  $ qsend //example.net/queue0 -m abc -m xyz
-  $ qsend queue0 queue1 < messages.txt
+Example usage:
+  $ qsend amqps://example.net/queue1 message1  # Send one message
+  $ qsend jobs message1 message2 message3      # Send three messages
+  $ qsend jobs < messages.txt                  # Send messages from a file
+  $ qsend jobs                                 # Send messages from the console
 """
 
 class SendCommand(MessagingCommand):
     def __init__(self, home_dir):
-        super(SendCommand, self).__init__(home_dir, "qsend", _Handler(self))
+        super().__init__(home_dir, "qsend", _Handler(self))
 
-        self.description = _description
-        self.epilog = url_epilog + _epilog
+        self.parser.description = _description + suite_description
+        self.parser.epilog = url_epilog + message_epilog + _epilog
 
-        self.add_link_arguments()
+        self.parser.add_argument("url", metavar="URL",
+                                 help="The location of a message source or target")
+        self.parser.add_argument("message", metavar="MESSAGE", nargs="*",
+                                 help="The content of a message")
+        self.parser.add_argument("-m", "--message", metavar="CONTENT",
+                                 action="append", default=list(), dest="message_compat",
+                                 help=_argparse.SUPPRESS)
+        self.parser.add_argument("--input", metavar="FILE",
+                                 help="Read messages from FILE, one per line (default stdin)")
 
-        self.add_argument("-m", "--message", metavar="CONTENT",
-                          action="append", default=list(),
-                          help="Send a message containing CONTENT.  This option can be repeated.")
-        self.add_argument("--input", metavar="FILE",
-                          help="Read messages from FILE, one per line (default stdin)")
-        self.add_argument("--presettled", action="store_true",
-                          help="Send messages fire-and-forget (at-most-once delivery)")
+        self.messaging_options.add_argument("--presettled", action="store_true",
+                                            help="Send messages fire-and-forget (at-most-once delivery)")
 
-    def init(self):
-        super(SendCommand, self).init()
+    def init(self, args):
+        super().init(args)
 
-        self.init_link_attributes()
+        self.scheme, self.host, self.port, self.address = self.parse_url(args.url)
 
-        self.presettled = self.args.presettled
+        self.presettled = args.presettled
 
-        if self.args.input is not None:
-            self.input_file = open(self.args.input, "r")
+        if args.input is not None:
+            self.input_file = open(args.input, "r")
 
-        if self.args.message:
-            for value in self.args.message:
+        if args.message or args.message_compat:
+            for value in args.message:
+                self.input_thread.push_line(value)
+
+            for value in args.message_compat:
                 self.input_thread.push_line(value)
 
             self.input_thread.push_line(DONE)
 
     def run(self):
         self.input_thread.start()
-        super(SendCommand, self).run()
 
-class _Handler(LinkHandler):
+        super().run()
+
+class _Handler(MessagingHandler):
     def __init__(self, command):
-        super(_Handler, self).__init__(command)
+        super().__init__(command)
 
-        self.senders = _collections.deque()
-
+        self.sender = None
         self.sent_messages = 0
         self.settled_messages = 0
 
-    def open_links(self, event, connection, address):
+    def open(self, event):
+        super().open(event)
+
         options = None
 
         if self.command.presettled:
             options = _reactor.AtMostOnce()
 
-        sender = event.container.create_sender(connection, address, options=options)
+        self.sender = event.container.create_sender(self.connection, self.command.address, options=options)
 
-        self.senders.appendleft(sender)
+    def close(self, event):
+        super().close(event)
 
-        return sender,
+        self.command.notice("Sent {} {}", self.sent_messages, plural("message", self.sent_messages))
 
     def on_input(self, event):
         self.send_message(event)
@@ -110,13 +117,7 @@ class _Handler(LinkHandler):
         if self.done_sending:
             return
 
-        sender = event.link
-
-        if sender is None:
-            sender = self.senders.pop()
-            self.senders.appendleft(sender)
-
-        if not sender.credit:
+        if not self.sender.credit:
             return
 
         try:
@@ -136,31 +137,16 @@ class _Handler(LinkHandler):
             return
 
         message = process_input_line(line)
-
-        if message.address is None:
-            message.address = sender.target.address
-
-        delivery = sender.send(message)
+        delivery = self.sender.send(message)
 
         self.sent_messages += 1
 
-        self.command.info("Sent {0} as {1} to {2} on {3}",
-                          message,
-                          delivery,
-                          sender.target,
-                          sender.connection)
+        self.command.info("Sent {} as {} to {} on {}", message, delivery, self.sender.target, self.sender.connection)
 
     def on_settled(self, event):
-        super(_Handler, self).on_settled(event)
+        super().on_settled(event)
 
         self.settled_messages += 1
 
         if self.done_sending and self.sent_messages == self.settled_messages:
             self.close(event)
-
-    def close(self, event):
-        super(_Handler, self).close(event)
-
-        self.command.notice("Sent {0} {1}",
-                            self.sent_messages,
-                            plural("message", self.sent_messages))

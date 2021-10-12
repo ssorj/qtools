@@ -23,26 +23,16 @@ set -e
 
 VIRTUALENV_ENABLED=$1
 
-qtools-test
+qtools-self-test
 
 if hash virtualenv && (( $VIRTUALENV_ENABLED == 1 )); then
-    if hash python2; then
-        TEST_ENV_DIR=$(mktemp -d)
-        virtualenv $TEST_ENV_DIR -p /usr/bin/python2 --no-setuptools --no-pip --no-wheel --no-download --system-site-packages
+    TEST_ENV_DIR=$(mktemp -d)
+    virtualenv $TEST_ENV_DIR -p /usr/bin/python3 --no-setuptools --no-pip --no-wheel --no-download \
+               --system-site-packages
 
-        (source $TEST_ENV_DIR/bin/activate && qtools-test)
+    (source $TEST_ENV_DIR/bin/activate && qtools-self-test)
 
-        rm -rf $TEST_ENV_DIR
-    fi
-
-    if hash python3; then
-        TEST_ENV_DIR=$(mktemp -d)
-        virtualenv $TEST_ENV_DIR -p /usr/bin/python3 --no-setuptools --no-pip --no-wheel --no-download --system-site-packages
-
-        (source $TEST_ENV_DIR/bin/activate && qtools-test)
-
-        rm -rf $TEST_ENV_DIR
-    fi
+    rm -rf $TEST_ENV_DIR
 else
     echo "Skipping virtualenv tests"
 fi

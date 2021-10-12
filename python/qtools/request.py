@@ -17,13 +17,7 @@
 # under the License.
 #
 
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import print_function
-from __future__ import unicode_literals
-from __future__ import with_statement
-
-import collections as _collections
+import argparse as _argparse
 import json as _json
 import proton as _proton
 import proton.reactor as _reactor
@@ -31,54 +25,58 @@ import sys as _sys
 
 from .common import *
 
-_description = "Send AMQP requests"
+_description = """
+Send AMQP requests.  Use qrequest in combination with the qrespond
+command to transfer requests through an AMQP message server.
+"""
 
 _epilog = """
-example usage:
-  $ qrequest //example.net/queue0 -m abc -m xyz
-  $ qrequest queue0 queue1 < messages.txt
+Example usage:
+  $ qrequest amqps://example.net/queue1 message1  # Send one request
+  $ qrequest jobs message1 message2 message3      # Send three requests
+  $ qrequest jobs < requests.txt                  # Send requests from a file
+  $ qrequest jobs                                 # Send requests from the console
 """
 
 class RequestCommand(MessagingCommand):
     def __init__(self, home_dir):
-        super(RequestCommand, self).__init__(home_dir, "qrequest", _Handler(self))
+        super().__init__(home_dir, "qrequest", _Handler(self))
 
-        self.description = _description
-        self.epilog = url_epilog + _epilog
+        self.parser.description = _description + suite_description
+        self.parser.epilog = url_epilog + message_epilog + _epilog
 
-        self.add_link_arguments()
+        self.parser.add_argument("url", metavar="URL",
+                                 help="The location of a message source or target")
+        self.parser.add_argument("message", metavar="MESSAGE", nargs="*",
+                                 help="The content of a request message")
+        self.parser.add_argument("-m", "--message", metavar="CONTENT",
+                                 action="append", default=list(), dest="message_compat",
+                                 help=_argparse.SUPPRESS)
+        self.parser.add_argument("--input", metavar="FILE",
+                                 help="Read request messages from FILE, one per line (default stdin)")
+        self.parser.add_argument("--output", metavar="FILE",
+                                 help="Write response messages to FILE (default stdout)")
+        self.parser.add_argument("--json", action="store_true",
+                                 help="Write messages in JSON format")
 
-        self.add_argument("-m", "--message", metavar="CONTENT",
-                          action="append", default=list(),
-                          help="Send a request message containing CONTENT.  This option can be repeated.")
-        self.add_argument("--input", metavar="FILE",
-                          help="Read request messages from FILE, one per line (default stdin)")
-        self.add_argument("--output", metavar="FILE",
-                          help="Write response messages to FILE (default stdout)")
-        self.add_argument("--json", action="store_true",
-                          help="Write messages in JSON format")
-        self.add_argument("--no-prefix", action="store_true",
-                          help="Suppress address prefix")
-        self.add_argument("--presettled", action="store_true",
-                          help="Send messages fire-and-forget (at-most-once delivery)")
+    def init(self, args):
+        super().init(args)
 
-    def init(self):
-        super(RequestCommand, self).init()
+        self.scheme, self.host, self.port, self.address = self.parse_url(args.url)
 
-        self.init_link_attributes()
+        self.json_enabled = args.json
 
-        self.json_enabled = self.args.json
-        self.prefix_disabled = self.args.no_prefix
-        self.presettled = self.args.presettled
+        if args.input is not None:
+            self.input_file = open(args.input, "r")
 
-        if self.args.input is not None:
-            self.input_file = open(self.args.input, "r")
+        if args.output is not None:
+            self.output_file = open(args.output, "w")
 
-        if self.args.output is not None:
-            self.output_file = open(self.args.output, "w")
+        if args.message or args.message_compat:
+            for value in args.message:
+                self.input_thread.push_line(value)
 
-        if self.args.message:
-            for value in self.args.message:
+            for value in args.message_compat:
                 self.input_thread.push_line(value)
 
             self.input_thread.push_line(DONE)
@@ -87,36 +85,32 @@ class RequestCommand(MessagingCommand):
         self.input_thread.start()
         self.output_thread.start()
 
-        super(RequestCommand, self).run()
+        super().run()
 
-class _Handler(LinkHandler):
+class _Handler(MessagingHandler):
     def __init__(self, command):
-        super(_Handler, self).__init__(command)
+        super().__init__(command)
 
-        self.senders = _collections.deque()
-        self.receivers_by_sender = dict()
-        self.senders_by_receiver = dict()
+        self.sender = None
+        self.receiver = None
 
-        self.current_message_id = 0
-        self.pending_ids = set()
+        self.current_request_id = 0
+        self.pending_request_ids = set()
 
         self.sent_requests = 0
         self.received_responses = 0
 
-    def open_links(self, event, connection, address):
-        options = None
+    def open(self, event):
+        super().open(event)
 
-        if self.command.presettled:
-            options = _reactor.AtMostOnce()
+        self.sender = event.container.create_sender(self.connection, self.command.address)
+        self.receiver = event.container.create_receiver(self.connection, None, dynamic=True, name="responses")
 
-        sender = event.container.create_sender(connection, address, options=options)
-        receiver = event.container.create_receiver(connection, None, dynamic=True, name="responses")
+    def close(self, event):
+        super().close(event)
 
-        self.senders.appendleft(sender)
-        self.receivers_by_sender[sender] = receiver
-        self.senders_by_receiver[receiver] = sender
-
-        return sender, receiver
+        self.command.notice("Sent {} {} and received {} {}", self.sent_requests, plural("request", self.sent_requests),
+                            self.received_responses, plural("response", self.received_responses))
 
     def on_input(self, event):
         self.send_message(event)
@@ -131,13 +125,7 @@ class _Handler(LinkHandler):
         if self.done_sending:
             return
 
-        sender = event.link
-
-        if sender is None:
-            sender = self.senders.pop()
-            self.senders.appendleft(sender)
-
-        if not sender.credit:
+        if not self.sender.credit:
             return
 
         try:
@@ -153,69 +141,38 @@ class _Handler(LinkHandler):
 
             return
 
-        receiver = self.receivers_by_sender[sender]
-
         message = process_input_line(line)
-        message.reply_to = receiver.remote_source.address
-
-        if message.address is None:
-            message.address = sender.target.address
+        message.reply_to = self.receiver.remote_source.address
 
         if message.id is None:
-            self.current_message_id += 1
+            self.current_request_id += 1
+            message.id = self.current_request_id
 
-            message.id = self.current_message_id
-
-        self.pending_ids.add(message.id)
-
-        delivery = sender.send(message)
+        delivery = self.sender.send(message)
 
         self.sent_requests += 1
+        self.pending_request_ids.add(message.id)
 
-        self.command.info("Sent request {0} as {1} to {2} on {3}",
-                          message,
-                          delivery,
-                          sender.target,
-                          sender.connection)
+        self.command.info("Sent request {} as {} to {} on {}", message, delivery, self.sender.target,
+                          self.sender.connection)
 
     def on_message(self, event):
-        message = event.message
-
-        assert message.correlation_id in self.pending_ids, (message.correlation_id, self.pending_ids)
-        # XXX remove id from pending_ids?
-
-        self.received_responses += 1
-
-        out = list()
-
-        if not self.command.prefix_disabled:
-            sender = self.senders_by_receiver[event.link]
-            prefix = sender.target.address + ": "
-            out.append(prefix)
+        assert event.message.correlation_id in self.pending_request_ids, \
+            (event.message.correlation_id, self.pending_request_ids)
 
         if self.command.json_enabled:
-            data = convert_message_to_data(message)
-            json = _json.dumps(data)
-            out.append(json)
+            data = convert_message_to_data(event.message)
+            line = _json.dumps(data)
         else:
-            out.append(message.body)
+            line = event.message.body
 
-        self.command.output_thread.push_line("".join(out))
+        self.command.output_thread.push_line(line)
 
-        self.command.info("Received response {0} from {1} on {2}",
-                          event.message,
-                          event.link.source,
-                          event.connection)
+        self.command.info("Received response {} from {} on {}", event.message, event.link.source, event.connection)
+
+        self.received_responses += 1
+        self.pending_request_ids.remove(event.message.correlation_id)
 
         if self.done_sending and self.sent_requests == self.received_responses:
             self.command.output_thread.push_line(DONE)
             self.close(event)
-
-    def close(self, event):
-        super(_Handler, self).close(event)
-
-        self.command.notice("Sent {0} {1} and received {2} {3}",
-                            self.sent_requests,
-                            plural("request", self.sent_requests),
-                            self.received_responses,
-                            plural("response", self.received_responses))

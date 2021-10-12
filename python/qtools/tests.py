@@ -19,126 +19,96 @@
 
 from commandant import TestSkipped
 from plano import *
+from subprocess import PIPE
 
-def open_test_session(session):
-    enable_logging(level="error")
-    session.test_timeout = 10
+home_dir = get_parent_dir(get_parent_dir(get_parent_dir(__file__)))
+test_cert_dir = join(home_dir, "test-certs")
+version_file = join(home_dir, "VERSION.txt")
 
 def start_qmessage(args, **kwargs):
-    return start_process("qmessage --verbose {0}", args, **kwargs)
+    return start(f"qmessage --verbose {args}", **kwargs)
 
 def start_qsend(url, args, **kwargs):
-    return start_process("qsend --verbose {0} {1}", url, args, **kwargs)
+    return start(f"qsend --verbose {url} {args}", **kwargs)
 
 def start_qreceive(url, args, **kwargs):
-    return start_process("qreceive --verbose {0} {1}", url, args, **kwargs)
+    return start(f"qreceive --verbose {url} {args}", **kwargs)
 
 def start_qrequest(url, args, **kwargs):
-    return start_process("qrequest --verbose {0} {1}", url, args, **kwargs)
+    return start(f"qrequest --verbose {url} {args}", **kwargs)
 
 def start_qrespond(url, args, **kwargs):
-    return start_process("qrespond --verbose {0} {1}", url, args, **kwargs)
+    return start(f"qrespond --verbose {url} {args}", **kwargs)
 
-def send_and_receive(url, qmessage_args="", qsend_args="", qreceive_args="--count 1"):
-    message_proc = start_qmessage(qmessage_args, stdout=PIPE)
-    send_proc = start_qsend(url, qsend_args, stdin=message_proc.stdout)
-    receive_proc = start_qreceive(url, qreceive_args, stdout=PIPE)
+def run_qsend_and_qreceive(url, qmessage_args="", qsend_args="", qreceive_args="--count 1"):
+    with temp_file() as output:
+        message_proc = start_qmessage(qmessage_args, stdout=PIPE)
+        send_proc = start_qsend(url, qsend_args, stdin=message_proc.stdout)
+        receive_proc = start_qreceive(url, qreceive_args, stdout=output)
 
-    try:
-        check_process(message_proc)
-        check_process(send_proc)
-        check_process(receive_proc)
-    except:
-        terminate_process(message_proc)
-        terminate_process(send_proc)
-        terminate_process(receive_proc)
+        try:
+            wait(message_proc)
+            wait(send_proc)
+            wait(receive_proc)
+        except:
+            kill(message_proc)
+            kill(send_proc)
+            kill(receive_proc)
 
-        raise
+            raise
 
-    receive_proc.stdout.flush() # XXX Hack to see if this fixes periodic empty string output
+        return read(output)[:-1]
 
-    output = receive_proc.communicate()[0].decode()
+def run_qrequest_and_qrespond(url, qmessage_args="", qrequest_args="", qrespond_args="--count 1"):
+    with temp_file() as output:
+        message_proc = start_qmessage(qmessage_args, stdout=PIPE)
+        request_proc = start_qrequest(url, qrequest_args, stdin=message_proc.stdout, stdout=output)
+        respond_proc = start_qrespond(url, qrespond_args)
 
-    return output[:-1]
+        try:
+            wait(message_proc)
+            wait(request_proc)
+            wait(respond_proc)
+        except:
+            kill(message_proc)
+            kill(request_proc)
+            kill(respond_proc)
 
-def request_and_respond(url, qmessage_args="", qrequest_args="", qrespond_args="--count 1"):
-    message_proc = start_qmessage(qmessage_args, stdout=PIPE)
-    request_proc = start_qrequest(url, qrequest_args, stdin=message_proc.stdout, stdout=PIPE)
-    respond_proc = start_qrespond(url, qrespond_args)
+            raise
 
-    try:
-        check_process(message_proc)
-        check_process(request_proc)
-        check_process(respond_proc)
-    except:
-        terminate_process(message_proc)
-        terminate_process(request_proc)
-        terminate_process(respond_proc)
+        return read(output)[:-1]
 
-        raise
-
-    request_proc.stdout.flush() # XXX Hack to see if this fixes periodic empty string output
-
-    output = request_proc.communicate()[0].decode()
-
-    return output[:-1]
-
-class TestServer(object):
+class TestServer:
     def __init__(self, **extra_args):
-        port = random_port()
-
+        port = get_random_port()
         args = " ".join(["--{} {}".format(k, v) for k, v in extra_args.items()])
 
-        self.proc = start_process("qbroker --verbose --port {} {}", port, args)
-
-        self.proc.url = "//localhost:{0}/q0".format(port)
+        self.proc = start(f"qbroker --verbose --port {port} {args}")
+        self.proc.url = f"//localhost:{port}/queue1"
 
     def __enter__(self):
         return self.proc
 
     def __exit__(self, exc_type, exc_value, traceback):
-        stop_process(self.proc)
+        stop(self.proc)
 
-def test_send_receive(session):
-    with TestServer() as server:
-        body = send_and_receive(server.url, "--body abc123", "", "--count 1 --no-prefix")
-        assert body == "abc123", body
+@test(timeout=5)
+def version():
+    result = call("qconnect --version")
+    assert result == read(version_file), (result, read(version_file))
 
-        send_and_receive(server.url, "", "--presettled")
-        send_and_receive(server.url, "", "-m abc --message xyz", "--count 2")
-        send_and_receive(server.url, "--count 10", "", "--count 10")
-        send_and_receive(server.url, "--count 10 --rate 1000", "", "--count 10")
-        send_and_receive(server.url, "", "--allowed-mechs anonymous --user harry", "--allowed-mechs anonymous --user sally --count 1")
+@test(timeout=5)
+def logging():
+    result = call("qconnect --version")
+    assert result
 
-def disabled_test_user_password_auth(session):
-    with TestServer(user="harold", password="x") as server:
-        body = send_and_receive(server.url, "--body abc123", "--user harold --password x", "--count 1 --no-prefix --user harold --password x")
-        assert body == "abc123", body
+    run("qconnect --init-only --quiet")
+    run("qconnect --init-only --verbose")
+    run("qconnect --init-only --debug")
 
-def test_request_respond(session):
-    with TestServer() as server:
-        body = request_and_respond(server.url, "--body abc123", "--no-prefix", "--count 1 --reverse --upper --append ' and this'")
-        assert body == "321CBA and this", body
-
-        request_and_respond(server.url, "", "--presettled")
-        request_and_respond(server.url, "", "-m abc --message xyz", "--count 2")
-        request_and_respond(server.url, "--count 10", "", "--count 10")
-        request_and_respond(server.url, "--count 10 --rate 1000", "", "--count 10")
-        request_and_respond(server.url, "", "--user harold --password when", "--user maude --password why --count 1")
-
-def test_message(session):
-    with TestServer() as server:
-        send_and_receive(server.url, "--id m1 --correlation-id c1")
-        send_and_receive(server.url, "--user ssorj")
-        send_and_receive(server.url, "--to xyz --reply-to abc")
-        send_and_receive(server.url, "--durable")
-        send_and_receive(server.url, "--priority 100")
-        send_and_receive(server.url, "--ttl 100.1")
-        send_and_receive(server.url, "--body hello")
-        send_and_receive(server.url, "--property x y --property a b")
-
-def test_ready_file(session):
-    def wait_for_ready(temp):
+@test(timeout=5)
+def ready_file():
+    def await_ready(temp):
             while True:
                 with open(temp) as f:
                     if f.read() == "ready\n":
@@ -148,32 +118,89 @@ def test_ready_file(session):
 
     with TestServer() as server:
         with temp_file() as temp:
-            proc = start_qsend(server.url, "--ready-file {0}".format(temp))
-            wait_for_ready(temp)
-            terminate_process(proc)
+            proc = start_qsend(server.url, "--ready-file {}".format(temp))
+            await_ready(temp)
+            kill(proc)
 
         with temp_file() as temp:
-            proc = start_qreceive(server.url, "--ready-file {0}".format(temp))
-            wait_for_ready(temp)
-            terminate_process(proc)
+            proc = start_qreceive(server.url, "--ready-file {}".format(temp))
+            await_ready(temp)
+            kill(proc)
 
-def test_tls(session):
-    raise TestSkipped("This test was enabled too soon.  New TLS code is coming.")
+@test(timeout=20)
+def qconnect():
+    with TestServer() as server:
+        run(f"qconnect --verbose {server.url}")
 
-    cert_dir = join(session.module.command.home, "test-certs")
-    server_cert = join(cert_dir, "server-cert.pem")
-    server_key = join(cert_dir, "server-key.pem")
-    client_cert = join(cert_dir, "client-cert.pem")
-    client_key = join(cert_dir, "client-key.pem")
+        try:
+            run("qconnect --verbose no-such-host")
+        except:
+            pass
+
+@test(timeout=5)
+def qsend_and_qreceive():
+    with TestServer() as server:
+        result = run_qsend_and_qreceive(server.url, "--body abc123", "", "--count 1")
+        assert result == "abc123", result
+
+        run_qsend_and_qreceive(server.url, "", "--presettled")
+        run_qsend_and_qreceive(server.url, "", "abc xyz", "--count 2")
+        run_qsend_and_qreceive(server.url, "--count 10", "", "--count 10")
+        run_qsend_and_qreceive(server.url, "--count 10 --rate 1000", "", "--count 10")
+
+@test(timeout=5)
+def qrequest_and_qrespond():
+    with TestServer() as server:
+        result = run_qrequest_and_qrespond(server.url, "--body abc123", "", "--count 1 --reverse --upper --append ' and this'")
+        assert result == "321CBA and this", result
+
+        run_qrequest_and_qrespond(server.url, "", "abc xyz", "--count 2")
+        run_qrequest_and_qrespond(server.url, "--count 10", "", "--count 10")
+        run_qrequest_and_qrespond(server.url, "--count 10 --rate 1000", "", "--count 10")
+
+@test(timeout=5)
+def qmessage():
+    with TestServer() as server:
+        run_qsend_and_qreceive(server.url, "--id m1 --correlation-id c1")
+        run_qsend_and_qreceive(server.url, "--user ssorj")
+        run_qsend_and_qreceive(server.url, "--to xyz --reply-to abc")
+        run_qsend_and_qreceive(server.url, "--durable")
+        run_qsend_and_qreceive(server.url, "--priority 100")
+        run_qsend_and_qreceive(server.url, "--ttl 100.1")
+        run_qsend_and_qreceive(server.url, "--body hello")
+        run_qsend_and_qreceive(server.url, "--property x y --property a b")
+
+@test(timeout=5)
+def sasl():
+    with TestServer() as server:
+        run_qsend_and_qreceive(server.url, "", "--sasl-mechs anonymous --user harry", "--sasl-mechs anonymous --user sally --count 1")
+
+    # with TestServer(user="harold", password="x") as server:
+    #     body = run_qsend_and_qreceive(server.url, "--body abc123", "--user harold --password x", "--count 1 --user harold --password x")
+    #     assert body == "abc123", body
+
+@test(timeout=5)
+def tls():
+    server_cert = join(test_cert_dir, "server-cert.pem")
+    server_key = join(test_cert_dir, "server-key.pem")
+    client_cert = join(test_cert_dir, "client-cert.pem")
+    client_key = join(test_cert_dir, "client-key.pem")
+    client_cert_and_key = join(test_cert_dir, "client-cert-and-key.pem")
 
     with TestServer(cert=server_cert, key=server_key) as server:
         client_args = "--tls --trust {}".format(server_cert)
         qreceive_args = "{} --count 1".format(client_args)
 
-        send_and_receive(server.url, qsend_args=client_args, qreceive_args=qreceive_args)
+        run_qsend_and_qreceive(server.url, qsend_args=client_args, qreceive_args=qreceive_args)
 
     with TestServer(cert=server_cert, key=server_key, trust=client_cert) as server:
         client_args = "--tls --cert {} --key {} --trust {}".format(client_cert, client_key, server_cert)
         qreceive_args = "{} --count 1".format(client_args)
 
-        send_and_receive(server.url, qsend_args=client_args, qreceive_args=qreceive_args)
+        run_qsend_and_qreceive(server.url, qsend_args=client_args, qreceive_args=qreceive_args)
+
+    with TestServer(cert=server_cert, key=server_key, trust=client_cert) as server:
+        client_args = "--tls --cert {} --trust {}".format(client_cert_and_key, server_cert)
+        qreceive_args = "{} --count 1".format(client_args)
+
+        run_qsend_and_qreceive(server.url, qsend_args=client_args, qreceive_args=qreceive_args)

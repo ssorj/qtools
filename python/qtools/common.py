@@ -17,43 +17,143 @@
 # under the License.
 #
 
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import print_function
-from __future__ import unicode_literals
-from __future__ import with_statement
-
 import argparse as _argparse
-import binascii as _binascii
 import collections as _collections
-import commandant as _commandant
 import json as _json
 import os as _os
 import proton as _proton
 import proton.handlers as _handlers
 import proton.reactor as _reactor
 import sys as _sys
-import time as _time
 import threading as _threading
+import time as _time
+import traceback as _traceback
+import urllib.parse as _urlparse
 import uuid as _uuid
 
-try:
-    from urllib.parse import urlparse as _urlparse
-except ImportError:
-    from urlparse import urlparse as _urlparse
-
-url_epilog = """
-address URLs:
-  [SCHEME:][//SERVER/]ADDRESS
-  queue0
-  //localhost/queue0
-  amqp://example.net:10000/jobs
-  amqps://10.0.0.10/jobs/alpha
+suite_description = """
+This command is part of the Qtools suite of AMQP 1.0 messaging tools
+including qconnect, qsend, qreceive, qmessage, qrespond, qrequest, and
+qbroker.
 """
 
-class MessagingCommand(_commandant.Command):
+url_epilog = """
+URLs:
+  [SCHEME:][//HOST[:PORT]/]ADDRESS (default amqp://localhost:5672/ADDRESS)
+  queue1
+  amqp://example.net/queue1
+  amqps://example.net:1000/notifications/system
+"""
+
+message_epilog = """
+Messages:
+  Message input strings are converted to AMQP messages with
+  corresponding string bodies.  If messages are supplied directly,
+  each string argument is one message.  If messages are read from a
+  file, each line is one message.
+
+  If the message input starts with "{" and ends with "}", it is parsed
+  as a JSON message input, allowing you to set other parts of the AMQP
+  message.  See qmessage for more information.
+
+    '{"id": "1", "properties": {"key": "value"}, "body": "hello"}'
+  """
+
+class Command:
+    def __init__(self, home, name):
+        self.home = home
+        self.name = name
+
+        with open(_os.path.join(self.home, "VERSION.txt")) as f:
+            self.version = f.read()
+
+        self.parser = _argparse.ArgumentParser()
+        self.parser.formatter_class = _argparse.RawDescriptionHelpFormatter
+
+        logging = self.parser.add_argument_group("Logging options")
+
+        logging.add_argument("--quiet", action="store_true",
+                             help="Print no logging to the console")
+        logging.add_argument("--verbose", action="store_true",
+                             help="Print detailed logging to the console")
+        logging.add_argument("--debug", action="store_true",
+                             help="Print debugging output to the console")
+
+        self.parser.add_argument("--version", action="version", version=self.version,
+                                 help="Print the Qtools version and exit")
+        self.parser.add_argument("--init-only", action="store_true",
+                                 help=_argparse.SUPPRESS)
+
+        self.quiet = False
+        self.verbose = False
+        self.debug_enabled = False
+        self.init_only = False
+
+    def log(self, message, *args):
+        summarized_args = [_summarize(x) for x in args]
+        message = message.format(*summarized_args)
+        print("{}: {}".format(self.id, message), file=_sys.stderr)
+
+    def info(self, message, *args):
+        if self.verbose:
+            self.log(message, *args)
+
+    def notice(self, message, *args):
+        if not self.quiet:
+            self.log(message, *args)
+
+    def warn(self, message, *args):
+        self.log("Warning! {}".format(message), *args)
+
+    def error(self, message, *args):
+        self.log("Error! {}".format(message), *args)
+
+    def fail(self, message, *args):
+        raise CommandError(message.format(*args))
+
+    def check_file(self, path):
+        if path is not None and not _os.path.exists(path):
+            raise CommandError("File '{}' not found".format(path))
+
+    def main(self, args=None):
+        args = self.parser.parse_args(args)
+
+        assert args is None or isinstance(args, _argparse.Namespace), args
+
+        try:
+            self.init(args)
+
+            if self.init_only:
+                return
+
+            self.run()
+        except KeyboardInterrupt:
+            pass
+        except CommandError as e:
+            if self.debug_enabled:
+                _traceback.print_exc()
+                exit(1)
+            else:
+                exit(str(e))
+
+    def init(self, args):
+        self.quiet = args.quiet
+        self.verbose = args.verbose
+        self.debug_enabled = args.debug
+        self.init_only = args.init_only
+
+        if self.debug_enabled:
+            self.verbose = True
+
+    def run(self):
+        pass
+
+class CommandError(Exception):
+    pass
+
+class MessagingCommand(Command):
     def __init__(self, home, name, handler):
-        super(MessagingCommand, self).__init__(home, name)
+        super().__init__(home, name)
 
         self.container = _reactor.Container(handler)
 
@@ -68,64 +168,64 @@ class MessagingCommand(_commandant.Command):
 
         self.ready = _threading.Event()
 
-        self.add_argument("--id", metavar="ID",
-                          help="Set the container identity to ID")
+        self.messaging_options = self.parser.add_argument_group("Messaging options")
 
-    def add_link_arguments(self):
-        self.add_argument("url", metavar="ADDRESS-URL", nargs="+",
-                          help="The location of a message source or target")
-        self.add_argument("--server", metavar="HOST[:PORT]", default="127.0.0.1:5672",
-                          help="Use HOST[:PORT] as the default server (default 127.0.0.1:5672)")
-        self.add_argument("--user", metavar="USER",
+        self.messaging_options.add_argument("--id", metavar="ID",
+                                            help="Set the client identity to ID (a default is generated)")
+
+        auth = self.parser.add_argument_group("Authentication options")
+
+        auth.add_argument("--user", metavar="USER",
                           help="Identify as USER")
-        self.add_argument("--password", metavar="SECRET",
+        auth.add_argument("--password", metavar="SECRET",
                           help="Prove your identity with SECRET")
-        self.add_argument("--allowed-mechs", metavar="MECHS", default="anonymous,plain",
+        auth.add_argument("--sasl-mechs", metavar="MECHS", default="anonymous,plain",
                           help="Restrict allowed SASL mechanisms to MECHS (default \"anonymous,plain\")")
-        self.add_argument("--tls", action="store_true",
-                          help="Connect using TLS authentication and encryption")
-        self.add_argument("--cert", metavar="FILE",
-                          help="The TLS certificate file")
-        self.add_argument("--key", metavar="FILE",
-                          help="The TLS private key file")
-        self.add_argument("--trust", metavar="FILE",
-                          help="Trust CA certificates in FILE")
-        self.add_argument("--ready-file", metavar="FILE",
-                          help="The file used to indicate the client is ready")
 
-    def init(self):
-        super(MessagingCommand, self).init()
+        tls = self.parser.add_argument_group("TLS options", "Certificate and key files are in PEM format")
 
-        self.id = self.args.id
+        tls.add_argument("--tls", action="store_true",
+                         help="Enable TLS authentication and encryption")
+        tls.add_argument("--cert", metavar="FILE",
+                         help="The client TLS certificate file")
+        tls.add_argument("--key", metavar="FILE",
+                         help="The client TLS private key file (default is the value for --cert)")
+        tls.add_argument("--trust", metavar="FILE",
+                         help="Trust server TLS certificates in FILE")
+
+        self.parser.add_argument("--ready-file", metavar="FILE",
+                                 help="Write \"ready\\n\" to FILE when the client is connected")
+
+    def init(self, args):
+        super().init(args)
+
+        self.id = args.id
 
         if self.id is None:
-            self.id = "{0}-{1}".format(self.name, unique_id())
+            self.id = "{}-{}".format(self.name, unique_id())
 
         self.container.container_id = self.id
 
-    def init_link_attributes(self):
-        self.urls = self.args.url
-        self.server = self.args.server
-        self.user = self.args.user
-        self.password = self.args.password
-        self.allowed_mechs = self.args.allowed_mechs.replace(",", " ").upper()
-        self.tls = self.args.tls
-        self.cert = self.args.cert
-        self.key = self.args.key
-        self.trust = self.args.trust
-        self.ready_file = self.args.ready_file
+        self.user = args.user
+        self.password = args.password
+        self.sasl_mechs = args.sasl_mechs.replace(",", " ").upper()
 
-        if self.cert and not _os.path.exists(self.cert):
-            self.fail("Cert file not found")
+        self.check_file(args.cert)
+        self.check_file(args.key)
+        self.check_file(args.trust)
 
-        if self.key and not _os.path.exists(self.key):
-            self.fail("Key file not found")
+        self.tls_enabled = args.tls
+        self.tls_cert = args.cert
+        self.tls_key = args.key
+        self.tls_trust = args.trust
 
-        if self.trust and not _os.path.exists(self.trust):
-            self.fail("Trust file not found")
+        if self.tls_key is None and self.tls_cert is not None:
+            self.tls_key = self.tls_cert
 
-    def parse_address_url(self, address):
-        url = _urlparse(address)
+        self.ready_file = args.ready_file
+
+    def parse_url(self, string):
+        url = _urlparse.urlparse(string)
 
         if url.path is None:
             self.fail("The URL has no path")
@@ -133,137 +233,113 @@ class MessagingCommand(_commandant.Command):
         scheme = url.scheme
         host = url.hostname
         port = url.port
-        path = url.path
-
-        default_scheme = "amqps" if self.tls else "amqp"
-
-        try:
-            default_host, default_port = self.server.split(":", 1)
-        except ValueError:
-            default_host, default_port = self.server, 5672
+        address = url.path
 
         if not scheme:
-            scheme = default_scheme
+            if self.tls_enabled:
+                scheme = "amqps"
+            else:
+                scheme = "amqp"
 
         if host is None:
-            host = default_host
+            host = "localhost"
 
         if port is None:
-            port = default_port
+            port = 5672
 
         port = str(port)
 
-        if path.startswith("/"):
-            path = path[1:]
+        if address.startswith("/"):
+            address = address[1:]
 
-        return scheme, host, port, path
+        return scheme, host, port, address
 
     def run(self):
         self.container.run()
 
-    def print_message(self, message, *args):
-        summarized_args = [_summarize(x) for x in args]
-        super(MessagingCommand, self).print_message(message, *summarized_args)
-
-class LinkHandler(_handlers.MessagingHandler):
+class MessagingHandler(_handlers.MessagingHandler):
     def __init__(self, command, **kwargs):
-        super(LinkHandler, self).__init__(**kwargs)
+        super().__init__(**kwargs)
 
         self.command = command
-
-        self.connections = list()
-        self.links = list()
-
-        self.opened_links = 0
+        self.connection = None
         self.done_sending = False
 
     def on_start(self, event):
-        for url in self.command.urls:
-            scheme, host, port, address = self.command.parse_address_url(url)
-            connection_url = "{0}://{1}:{2}".format(scheme, host, port)
-            ssl_domain = None
+        self.open(event)
 
-            if self.command.tls or scheme == "amqps":
-                ssl_domain = _proton.SSLDomain(_proton.SSLDomain.MODE_CLIENT)
+    def open(self, event):
+        scheme = "amqps" if self.command.tls_enabled else self.command.scheme
+        connection_url = "{}://{}:{}".format(scheme, self.command.host, self.command.port)
+        ssl_domain = None
 
-                if self.command.cert:
-                    ssl_domain.set_credentials(self.command.cert, self.command.key, None)
+        if self.command.tls_enabled or scheme == "amqps":
+            self.command.info("Enabling TLS")
 
-                if self.command.trust is not None:
-                    ssl_domain.set_peer_authentication(_proton.SSLDomain.VERIFY_PEER, self.command.trust)
-                    ssl_domain.set_trusted_ca_db(self.command.trust)
-                else:
-                    ssl_domain.set_peer_authentication(_proton.SSLDomain.VERIFY_PEER_NAME)
+            ssl_domain = _proton.SSLDomain(_proton.SSLDomain.MODE_CLIENT)
 
-            self.command.info("Connecting to {0}", connection_url)
+            if self.command.tls_cert:
+                self.command.info("Using TLS cert in {}", self.command.tls_cert)
+                self.command.info("Using TLS key in {}", self.command.tls_key)
 
-            connection = event.container.connect(connection_url,
-                                                 user=self.command.user,
-                                                 password=self.command.password,
-                                                 allowed_mechs=self.command.allowed_mechs,
-                                                 ssl_domain=ssl_domain)
+                ssl_domain.set_credentials(self.command.tls_cert, self.command.tls_key, None)
 
-            links = self.open_links(event, connection, address)
+            if self.command.tls_trust is not None:
+                self.command.info("Trusting certs in {}", self.command.tls_trust)
 
-            self.connections.append(connection)
-            self.links.extend(links)
+                ssl_domain.set_peer_authentication(_proton.SSLDomain.VERIFY_PEER, self.command.tls_trust)
+                ssl_domain.set_trusted_ca_db(self.command.tls_trust)
+            else:
+                ssl_domain.set_peer_authentication(_proton.SSLDomain.VERIFY_PEER_NAME)
 
-    def open_links(self, connection):
-        raise NotImplementedError()
+        if self.command.user is not None:
+            self.command.info("Connecting to {} as user '{}'", connection_url, self.command.user)
+        else:
+            self.command.info("Connecting to {}", connection_url)
+
+        self.connection = event.container.connect(connection_url,
+                                                  user=self.command.user,
+                                                  password=self.command.password,
+                                                  allowed_mechs=self.command.sasl_mechs,
+                                                  ssl_domain=ssl_domain)
+
+    def close(self, event):
+        self.connection.close()
+        self.command.events.close()
 
     def on_connection_opened(self, event):
-        assert event.connection in self.connections
-
-        self.command.info("Connected to {0}", event.connection)
+        self.command.info("Connected to {}", event.connection)
 
     def on_link_opened(self, event):
-        assert event.link in self.links
-
-        self.opened_links += 1
-
         if event.link.is_receiver:
-            self.command.notice("Created receiver for {0} on {1}",
-                                event.link.source,
-                                event.connection)
+            self.command.notice("Created receiver for {} on {}", event.link.source, event.connection)
 
         if event.link.is_sender and event.link.target.address is not None:
-            self.command.notice("Created sender for {0} on {1}",
-                                event.link.target,
-                                event.connection)
+            self.command.notice("Created sender for {} on {}", event.link.target, event.connection)
 
-        if self.opened_links == len(self.links):
-            if self.command.ready_file is not None:
-                with open(self.command.ready_file, "w") as f:
-                    f.write("ready\n")
+        if self.command.ready_file is not None:
+            with open(self.command.ready_file, "w") as f:
+                f.write("ready\n")
 
-            self.command.ready.set()
+        self.command.ready.set()
 
     def on_settled(self, event):
-        template = "Container '{0}' {1} {2}"
-        container = event.connection.remote_container
+        template = "Server '{}' {} {}"
+        server = event.connection.remote_container
         delivery = event.delivery
 
         if delivery.remote_state == delivery.ACCEPTED:
-            self.command.info(template, container, "accepted", delivery)
+            self.command.info(template, server, "accepted", delivery)
         elif delivery.remote_state == delivery.REJECTED:
-            self.command.warn(template, container, "rejected", delivery)
+            self.command.warn(template, server, "rejected", delivery)
         elif delivery.remote_state == delivery.RELEASED:
-            self.command.notice(template, container, "released", delivery)
+            self.command.notice(template, server, "released", delivery)
         elif delivery.remote_state == delivery.MODIFIED:
-            self.command.notice(template, container, "modified", delivery)
+            self.command.notice(template, server, "modified", delivery)
 
     def on_transport_error(self, event):
         cond = event.transport.condition
-        self.command.error("{0}: {1}", cond.name, cond.description)
-
-    def close(self, event):
-        for link in self.links:
-            link.close()
-
-        for connection in self.connections:
-            connection.close()
-
-        self.command.events.close()
+        self.command.error("{}: {}", cond.name, cond.description)
 
 DONE = object()
 
@@ -276,11 +352,12 @@ class _InputOutputThread(_threading.Thread):
         self.daemon = True
 
         self.lines = _collections.deque()
-        self.lines_queued = _threading.Event()
+        self.lines_cv = _threading.Condition(_threading.Lock())
 
     def push_line(self, line):
-        self.lines.appendleft(line)
-        self.lines_queued.set()
+        with self.lines_cv:
+            self.lines.appendleft(line)
+            self.lines_cv.notify()
 
 class _InputThread(_InputOutputThread):
     def run(self):
@@ -297,7 +374,7 @@ class _InputThread(_InputOutputThread):
                 self.push_line(line[:-1])
 
     def push_line(self, line):
-        super(_InputThread, self).push_line(line)
+        super().push_line(line)
         self.command.events.trigger(_reactor.ApplicationEvent("input"))
 
 class _OutputThread(_InputOutputThread):
@@ -305,17 +382,12 @@ class _OutputThread(_InputOutputThread):
         self.command.ready.wait()
 
         with self.command.output_file as f:
-            while True:
-                self.lines_queued.wait()
-                self.lines_queued.clear()
-
+            with self.lines_cv:
                 while True:
-                    try:
-                        line = self.lines.pop()
-                    except IndexError:
-                        break
+                    while len(self.lines) == 0:
+                        self.lines_cv.wait()
 
-                    print("DEBUG:", line, file=_sys.stderr)
+                    line = self.lines.pop()
 
                     if line is DONE:
                         return
@@ -339,7 +411,7 @@ def _summarize(entity):
     return entity
 
 def _summarize_connection(connection):
-    return "container '{0}'".format(connection.remote_container)
+    return "server '{}'".format(connection.remote_container)
 
 def _summarize_terminus(terminus):
     if terminus.type == terminus.SOURCE:
@@ -351,14 +423,14 @@ def _summarize_terminus(terminus):
 
     if terminus.address is None:
         if terminus.dynamic:
-            return "dynamic {0}".format(type_)
+            return "dynamic {}".format(type_)
 
-        return "null {0}".format(type_)
+        return "null {}".format(type_)
 
-    return "{0} '{1}'".format(type_, terminus.address)
+    return "{} '{}'".format(type_, terminus.address)
 
 def _summarize_delivery(delivery):
-    return "delivery '{0}'".format(delivery.tag)
+    return "delivery '{}'".format(delivery.tag)
 
 def _summarize_message(message):
     desc = message.body
@@ -373,9 +445,9 @@ def _summarize_message(message):
         desc = desc.value
 
     if len(desc) > 16:
-        desc = "{0}...".format(desc[:12])
+        desc = "{}...".format(desc[:12])
 
-    return "message '{0}'".format(desc)
+    return "message '{}'".format(desc)
 
 def process_input_line(line):
     if line.endswith("\n"):
@@ -461,10 +533,7 @@ def _set_data_attribute(data, dname, message, mname, omit_if_empty=True):
     data[dname] = value
 
 def unique_id():
-    bytes_ = _uuid.uuid4().bytes[:2]
-    hex_ = _binascii.hexlify(bytes_).decode("utf-8")
-
-    return hex_
+    return _uuid.uuid4().hex[:8]
 
 def plural(word, count, override=None):
     if count == 1:

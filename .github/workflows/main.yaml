@@ -1,0 +1,17 @@
+name: main
+on: [push, pull_request]
+jobs:
+  ubuntu:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v2
+    - uses: actions/setup-python@v2
+    - run: |
+        sudo apt-get -qq update > /dev/null
+        sudo apt-get -qq install software-properties-common > /dev/null
+        sudo add-apt-repository -y ppa:qpid/released > /dev/null
+        sudo apt-get -qq update > /dev/null
+        sudo apt-get -qq install python3-qpid-proton python3-distutils > /dev/null
+    - run: ./plano install
+    - run: echo "$HOME/.local/bin" >> $GITHUB_PATH
+    - run: qtools-self-test

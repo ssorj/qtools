@@ -50,7 +50,7 @@ class Broker:
         self.init_only = init_only
 
         if self.id is None:
-            self.id = "broker-{0}".format(str(_uuid.uuid4())[:8])
+            self.id = "broker-{0}".format(_uuid.uuid4().hex[:8])
 
         self.container = _reactor.Container(_Handler(self))
         self.container.container_id = self.id # XXX Obnoxious
@@ -135,6 +135,11 @@ class Broker:
                 return
 
             self.container.run()
+        except OSError as e:
+            if self.debug_enabled:
+                raise
+
+            self.fail(e)
         finally:
             if self._config_dir and _os.path.exists(self._config_dir):
                 _shutil.rmtree(self.dir, ignore_errors=True)
@@ -325,19 +330,19 @@ class _Handler(_handlers.MessagingHandler):
         queue.forward_messages()
 
     def on_settled(self, event):
-        template = "Container '{0}' {1} {2} for {3}"
-        container = event.connection.remote_container
+        template = "Client '{0}' {1} {2} for {3}"
+        client = event.connection.remote_container
         source = _terminus_repr(event.link.source)
         delivery = event.delivery
 
         if delivery.remote_state == delivery.ACCEPTED:
-            self.broker.info(template, container, "accepted", _delivery_repr(delivery), source)
+            self.broker.info(template, client, "accepted", _delivery_repr(delivery), source)
         elif delivery.remote_state == delivery.REJECTED:
-            self.broker.warn(template, container, "rejected", _delivery_repr(delivery), source)
+            self.broker.warn(template, client, "rejected", _delivery_repr(delivery), source)
         elif delivery.remote_state == delivery.RELEASED:
-            self.broker.notice(template, container, "released", _delivery_repr(delivery), source)
+            self.broker.notice(template, client, "released", _delivery_repr(delivery), source)
         elif delivery.remote_state == delivery.MODIFIED:
-            self.broker.notice(template, container, "modified", _delivery_repr(delivery), source)
+            self.broker.notice(template, client, "modified", _delivery_repr(delivery), source)
 
     def on_message(self, event):
         message = event.message
@@ -355,7 +360,7 @@ class _Handler(_handlers.MessagingHandler):
         self.broker.debug("Unhandled event: {0} {1}", name, event)
 
 def _container_repr(connection):
-    return "container '{0}'".format(connection.remote_container)
+    return "client '{0}'".format(connection.remote_container)
 
 def _terminus_repr(terminus):
     return "terminus '{0}'".format(terminus.address)

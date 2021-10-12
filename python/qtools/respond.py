@@ -17,12 +17,6 @@
 # under the License.
 #
 
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import print_function
-from __future__ import unicode_literals
-from __future__ import with_statement
-
 import proton as _proton
 import proton.handlers as _handlers
 import proton.reactor as _reactor
@@ -32,68 +26,50 @@ import traceback as _traceback
 
 from .common import *
 
-_description = "Respond to AMQP requests"
+_description = """
+Respond to AMQP requests.  Use qrespond in combination with the
+qrequest command to transfer requests through an AMQP message server.
+"""
 
 _epilog = """
-processing configuration:
-  The supplied config file must define a Python function like this:
-
-    def process(request, response):
-        response.body = request.body.upper()
-
-  The request and response arguments are Proton message objects.  The
-  return value is ignored.
-
-example usage:
-  $ qrespond //example.net/queue0
-  $ qrespond queue0 queue1
+Example usage:
+  $ qrespond amqps://example.net/queue1  # Respond to requests indefinitely
+  $ qrespond jobs --count 1              # Respond to one request
+  $ qrespond jobs --upper --reverse      # Transform the request text
 """
 
 class RespondCommand(MessagingCommand):
     def __init__(self, home_dir):
-        super(RespondCommand, self).__init__(home_dir, "qrespond", _Handler(self))
+        super().__init__(home_dir, "qrespond", _Handler(self))
 
-        self.description = _description
-        self.epilog = url_epilog + _epilog
+        self.parser.description = _description + suite_description
+        self.parser.epilog = url_epilog + _epilog
 
-        self.add_link_arguments()
+        self.parser.add_argument("url", metavar="URL",
+                                 help="The location of a message source or target")
+        self.parser.add_argument("-c", "--count", metavar="COUNT", type=int,
+                                 help="Exit after processing COUNT requests")
 
-        self.add_argument("-c", "--count", metavar="COUNT", type=int,
-                          help="Exit after processing COUNT requests")
-        self.add_argument("--config", metavar="FILE",
-                          help="Load processing code from FILE")
-        self.add_argument("--upper", action="store_true",
-                          help="Convert the request text to upper case")
-        self.add_argument("--reverse", action="store_true",
-                          help="Reverse the request text")
-        self.add_argument("--append", metavar="STRING",
-                          help="Append STRING to the request text")
+        processing_options = self.parser.add_argument_group \
+            ("Request processing options",
+             "By default, qrespond returns the request text unchanged")
 
-    def init(self):
-        super(RespondCommand, self).init()
+        processing_options.add_argument("--upper", action="store_true",
+                                        help="Convert the request text to upper case")
+        processing_options.add_argument("--reverse", action="store_true",
+                                        help="Reverse the request text")
+        processing_options.add_argument("--append", metavar="STRING",
+                                        help="Append STRING to the request text")
 
-        self.init_link_attributes()
+    def init(self, args):
+        super().init(args)
 
-        if self.args.config is not None:
-            config_file = self.args.config
+        self.scheme, self.host, self.port, self.address = self.parse_url(args.url)
 
-            if config_file == "-":
-                config_file = "/dev/stdin"
-
-            try:
-                config = _runpy.run_path(config_file)
-            except:
-                self.fail("Failed to load config from '{0}'", config_file)
-
-            try:
-                self.process = config["process"]
-            except KeyError:
-                self.fail("Function 'process' not found in '{0}'", config_file)
-
-        self.desired_messages = self.args.count
-        self.upper = self.args.upper
-        self.reverse = self.args.reverse
-        self.append = self.args.append
+        self.desired_messages = args.count
+        self.upper = args.upper
+        self.reverse = args.reverse
+        self.append = args.append
 
     def process(self, request, response):
         text = request.body
@@ -112,33 +88,28 @@ class RespondCommand(MessagingCommand):
 
         response.body = text
 
-class _Handler(LinkHandler):
+class _Handler(MessagingHandler):
     def __init__(self, command):
-        super(_Handler, self).__init__(command, auto_accept=False)
+        super().__init__(command, auto_accept=False)
 
-        self.receivers = list()
-        self.senders_by_receiver = dict()
-
+        self.receiver = None
         self.processed_requests = 0
 
-    def open_links(self, event, connection, address):
-        receiver = event.container.create_receiver(connection, address)
-        sender = event.container.create_sender(connection, None)
+    def open(self, event):
+        super().open(event)
 
-        self.receivers.append(receiver)
-        self.senders_by_receiver[receiver] = sender
+        self.receiver = event.container.create_receiver(self.connection, self.command.address)
+        self.sender = event.container.create_sender(self.connection, None)
 
-        return receiver, sender
+    def close(self, event):
+        super().close(event)
+
+        self.command.notice("Processed {} {}", self.processed_requests, plural("request", self.processed_requests))
 
     def on_message(self, event):
-        delivery = event.delivery
         request = event.message
-        receiver = event.link
 
-        self.command.info("Received request {0} from {1} on {2}",
-                          request,
-                          receiver.source,
-                          event.connection)
+        self.command.info("Received request {} from {} on {}", request, self.receiver, event.connection)
 
         response = _proton.Message()
         response.address = request.reply_to
@@ -146,34 +117,24 @@ class _Handler(LinkHandler):
 
         try:
             self.command.process(request, response)
-            processing_succeeded = True
         except:
             processing_succeeded = False
             _traceback.print_exc()
+        else:
+            processing_succeeded = True
 
         self.processed_requests += 1
 
         if processing_succeeded:
-            sender = self.senders_by_receiver[event.link]
-            sender.send(response)
+            self.sender.send(response)
 
-            self.command.info("Sent response {0} to address '{1}' on {2}",
-                              response,
-                              response.address,
-                              event.connection)
+            self.command.info("Sent response {} to address '{}' on {}", response, response.address, event.connection)
 
-            self.accept(delivery)
+            self.accept(event.delivery)
         else:
-            self.command.warn("Processing request {0} failed", request)
+            self.command.warn("Processing request {} failed", request)
 
-            self.reject(delivery)
+            self.reject(event.delivery)
 
         if self.processed_requests == self.command.desired_messages:
             self.close(event)
-
-    def close(self, event):
-        super(_Handler, self).close(event)
-
-        self.command.notice("Processed {0} {1}",
-                            self.processed_requests,
-                            plural("request", self.processed_requests))
