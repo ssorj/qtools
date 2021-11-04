@@ -17,6 +17,7 @@
 # under the License.
 #
 
+from commandant import TestSkipped
 from plano import *
 
 def open_test_session(session):
@@ -157,6 +158,8 @@ def test_ready_file(session):
             terminate_process(proc)
 
 def test_tls(session):
+    raise TestSkipped("This test was enabled too soon.  New TLS code is coming.")
+
     cert_dir = join(session.module.command.home, "test-certs")
     server_cert = join(cert_dir, "server-cert.pem")
     server_key = join(cert_dir, "server-key.pem")
