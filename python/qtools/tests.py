@@ -17,7 +17,6 @@
 # under the License.
 #
 
-from commandant import TestSkipped
 from plano import *
 from subprocess import PIPE
 
