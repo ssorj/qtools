@@ -53,6 +53,7 @@ def build(app):
 @command
 def install(app, prefix=prefix, dest_dir="/"):
     run(f"./setup.py install --root {dest_dir} --prefix {prefix}")
+    remove(join(dest_dir, prefix, "lib", f"python{sys.version_info.major}.{sys.version_info.minor}"))
 
 @command
 def clean(app):
