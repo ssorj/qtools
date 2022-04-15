@@ -33,6 +33,7 @@ class Broker:
     def __init__(self, host, port, id=None, ready_file=None,
                  user=None, password=None,
                  cert=None, key=None, trust=None,
+                 topics=None,
                  quiet=False, verbose=False, debug_enabled=False,
                  init_only=False):
         self.host = host
@@ -59,6 +60,11 @@ class Broker:
             self.verbose = True
 
         self._config_dir = None
+        self._nodes = dict()
+
+        if topics:
+            for address in topics:
+                self._create_topic(address)
 
     def init(self):
         self.info("Initializing {0}", self)
@@ -144,6 +150,30 @@ class Broker:
             if self._config_dir and _os.path.exists(self._config_dir):
                 _shutil.rmtree(self.dir, ignore_errors=True)
 
+    def _get_node(self, address):
+        try:
+            node = self._nodes[address]
+        except KeyError:
+            node = self._create_queue(address)
+
+        return node
+
+    def _create_queue(self, address):
+        assert address not in self._nodes, address
+
+        node = _Queue(self, address)
+        self._nodes[address] = node
+
+        return node
+
+    def _create_topic(self, address):
+        assert address not in self._nodes, address
+
+        node = _Topic(self, address)
+        self._nodes[address] = node
+
+        return node
+
 class _Queue:
     def __init__(self, broker, address):
         self.broker = broker
@@ -205,13 +235,82 @@ class _Queue:
 
         self.consumers.rotate(sent)
 
+class _Topic(object):
+    def __init__(self, broker, address):
+        self.broker = broker
+        self.address = address
+
+        self.messages = _collections.deque()
+        self.consumers = _collections.deque()
+        self.consumer_offsets = _collections.defaultdict(int)
+
+        self.broker.info("Created {0}", self)
+
+    def __repr__(self):
+        return "topic '{0}'".format(self.address)
+
+    def add_consumer(self, link):
+        assert link.is_sender
+        assert link not in self.consumers
+
+        self.consumers.append(link)
+
+        self.broker.info("Added consumer for {0} to {1}", _container_repr(link.connection), self)
+
+    def remove_consumer(self, link):
+        assert link.is_sender
+
+        try:
+            self.consumers.remove(link)
+        except ValueError:
+            return
+
+        try:
+            del self.consumer_offsets[link]
+        except KeyError:
+            return
+
+        self.broker.info("Removed consumer for {0} from {1}", _container_repr(link.connection), self)
+
+    def store_message(self, delivery, message):
+        self.messages.append(message)
+
+        self.broker.notice("Stored {0} from {1} on {2}", message, _container_repr(delivery.connection), self)
+
+    def forward_messages(self):
+        credit = sum([x.credit for x in self.consumers])
+        sent = 0
+
+        if credit == 0:
+            return
+
+        while sent < credit:
+            for consumer in self.consumers:
+                if consumer.credit == 0:
+                    continue
+
+                offset = self.consumer_offsets[consumer]
+
+                try:
+                    message = self.messages[offset]
+                except IndexError:
+                    self.consumers.rotate(sent)
+                    return
+
+                consumer.send(message)
+                sent += 1
+
+                self.consumer_offsets[consumer] += 1
+
+                self.broker.notice("Forwarded {0} on {1} to {2}", message, self, _container_repr(consumer.connection))
+
+        self.consumers.rotate(sent)
+
 class _Handler(_handlers.MessagingHandler):
     def __init__(self, broker):
         super(_Handler, self).__init__()
 
         self.broker = broker
-        self.queues = dict()
-        self.verbose = False
 
     def on_start(self, event):
         interface = "{0}:{1}".format(self.broker.host, self.broker.port)
@@ -236,21 +335,6 @@ class _Handler(_handlers.MessagingHandler):
             with open(self.broker.ready_file, "w") as f:
                 f.write("ready\n")
 
-    def get_queue(self, address):
-        try:
-            queue = self.queues[address]
-        except KeyError:
-            queue = self.create_queue(address)
-
-        return queue
-
-    def create_queue(self, address):
-        assert address not in self.queues, address
-
-        queue = _Queue(self.broker, address)
-        self.queues[address] = queue
-        return queue
-
     def on_link_opening(self, event):
         if event.link.is_sender:
             # A client receiving from the broker
@@ -258,18 +342,18 @@ class _Handler(_handlers.MessagingHandler):
             if event.link.remote_source.dynamic:
                 # A temporary queue
                 address = "{0}/{1}".format(event.connection.remote_container, event.link.name)
-                queue = self.create_queue(address)
+                node = self.broker._create_queue(address)
             elif event.link.remote_source.address in (None, ""):
                 raise Exception("The client created a receiver with no source address")
             else:
-                # A named queue
+                # A named queue or topic
                 address = event.link.remote_source.address
-                queue = self.get_queue(address)
+                node = self.broker._get_node(address)
 
             assert address is not None
 
             event.link.source.address = address
-            queue.add_consumer(event.link)
+            node.add_consumer(event.link)
 
         if event.link.is_receiver:
             # A client sending to the broker
@@ -277,21 +361,21 @@ class _Handler(_handlers.MessagingHandler):
             if event.link.remote_target.dynamic:
                 # A temporary queue
                 address = "{0}/{1}".format(event.connection.remote_container, event.link.name)
-                queue = self.create_queue(address)
+                node = self.broker._create_queue(address)
             elif event.link.remote_target.address in (None, ""):
                 # Anonymous relay - no queueing
                 address = None
             else:
-                # A named queue
+                # A named queue or topic
                 address = event.link.remote_target.address
-                queue = self.get_queue(address)
+                node = self.broker._get_node(address)
 
             event.link.target.address = address
 
     def on_link_closing(self, event):
         if event.link.is_sender:
-            queue = self.queues[event.link.source.address]
-            queue.remove_consumer(event.link)
+            node = self.broker._nodes[event.link.source.address]
+            node.remove_consumer(event.link)
 
     def on_connection_opening(self, event):
         # XXX I think this should happen automatically
@@ -316,8 +400,8 @@ class _Handler(_handlers.MessagingHandler):
 
         while link is not None:
             if link.is_sender:
-                queue = self.queues[link.source.address]
-                queue.remove_consumer(link)
+                node = self.broker._nodes[link.source.address]
+                node.remove_consumer(link)
 
             link = link.next(_proton.Endpoint.REMOTE_ACTIVE)
 
@@ -326,8 +410,8 @@ class _Handler(_handlers.MessagingHandler):
             event.link.drained()
 
     def on_sendable(self, event):
-        queue = self.get_queue(event.link.source.address)
-        queue.forward_messages()
+        node = self.broker._get_node(event.link.source.address)
+        node.forward_messages()
 
     def on_settled(self, event):
         template = "Client '{0}' {1} {2} for {3}"
@@ -352,9 +436,9 @@ class _Handler(_handlers.MessagingHandler):
         if address in (None, ""):
             address = message.address
 
-        queue = self.get_queue(address)
-        queue.store_message(delivery, message)
-        queue.forward_messages()
+        node = self.broker._get_node(address)
+        node.store_message(delivery, message)
+        node.forward_messages()
 
     def on_unhandled(self, name, event):
         self.broker.debug("Unhandled event: {0} {1}", name, event)
@@ -368,7 +452,7 @@ def _terminus_repr(terminus):
 def _delivery_repr(delivery):
     return "delivery '{0}'".format(delivery.tag)
 
-def wait_for_broker(ready_file, timeout=30):
+def await_broker(ready_file, timeout=30):
     start_time = _time.time()
     interval = 0.125
 
@@ -414,6 +498,8 @@ def main():
     parser.add_argument("--trust", metavar="FILE",
                         help="The file containing trusted client certificates.  "
                         "If set, the server verifies client certificates.")
+    parser.add_argument("--topic", metavar="ADDRESS", action="append",
+                        help="Configure multicast distribution for ADDRESS")
     parser.add_argument("--quiet", action="store_true",
                         help="Print no logging to the console")
     parser.add_argument("--verbose", action="store_true",
@@ -449,6 +535,7 @@ def main():
     broker = _Broker(args.host, args.port, id=args.id, ready_file=args.ready_file,
                      # user=args.user, password=args.password, allowed_mechs=args.allowed_mechs,
                      cert=args.cert, key=args.key, trust=args.trust,
+                     topics=args.topic,
                      quiet=args.quiet, verbose=args.verbose, debug_enabled=args.debug,
                      init_only=args.init_only)
 
