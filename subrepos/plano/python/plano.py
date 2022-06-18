@@ -496,17 +496,26 @@ def which(program_name):
         if _os.access(program, _os.X_OK):
             return program
 
-def check_env(var):
+def check_env(var, message=None):
     if var not in _os.environ:
-        raise PlanoError("Environment variable {0} is not set".format(repr(var)))
+        if message is None:
+            message = "Environment variable {0} is not set".format(repr(var))
 
-def check_module(module):
+        raise PlanoError(message)
+
+def check_module(module, message=None):
     if _pkgutil.find_loader(module) is None:
-        raise PlanoError("Module {0} is not found".format(repr(module)))
+        if message is None:
+            message = "Module {0} is not found".format(repr(module))
 
-def check_program(program):
+        raise PlanoError(message)
+
+def check_program(program, message=None):
     if which(program) is None:
-        raise PlanoError("Program {0} is not found".format(repr(program)))
+        if message is None:
+            message = "Program {0} is not found".format(repr(program))
+
+        raise PlanoError(message)
 
 class working_env(object):
     def __init__(self, **vars):
@@ -714,6 +723,19 @@ def tail_lines(file, count):
 
 def replace_in_file(file, expr, replacement, count=0):
     write(file, replace(read(file), expr, replacement, count=count))
+
+def concatenate(file, input_files):
+    assert file not in input_files
+
+    make_parent_dir(file, quiet=True)
+
+    with open(file, "wb") as f:
+        for input_file in input_files:
+            if not exists(input_file):
+                continue
+
+            with open(input_file, "rb") as inf:
+                _shutil.copyfileobj(inf, f)
 
 ## Iterable operations
 
@@ -1965,7 +1987,7 @@ def command(_function=None, name=None, args=None, parent=None):
             self.parent = parent
 
             if self.parent is None:
-                self.name = nvl(self.name, function.__name__.replace("_", "-"))
+                self.name = nvl(self.name, function.__name__.rstrip("_").replace("_", "-"))
                 self.args = self.process_args(self.args)
             else:
                 self.name = nvl(self.name, self.parent.name)
@@ -2013,14 +2035,17 @@ def command(_function=None, name=None, args=None, parent=None):
                     arg = CommandArgument(param.name)
 
                 if param.kind is param.POSITIONAL_ONLY: # pragma: nocover
-                    arg.positional = True
+                    if arg.positional is None:
+                        arg.positional = True
                 elif param.kind is param.POSITIONAL_OR_KEYWORD and param.default is param.empty:
-                    arg.positional = True
+                    if arg.positional is None:
+                        arg.positional = True
                 elif param.kind is param.POSITIONAL_OR_KEYWORD and param.default is not param.empty:
                     arg.optional = True
                     arg.default = param.default
                 elif param.kind is param.VAR_POSITIONAL:
-                    arg.positional = True
+                    if arg.positional is None:
+                        arg.positional = True
                     arg.multiple = True
                 elif param.kind is param.VAR_KEYWORD:
                     continue
@@ -2114,7 +2139,7 @@ def command(_function=None, name=None, args=None, parent=None):
         return Command(_function)
 
 class CommandArgument(object):
-    def __init__(self, name, display_name=None, type=None, metavar=None, help=None, short_option=None, default=None, positional=False):
+    def __init__(self, name, display_name=None, type=None, metavar=None, help=None, short_option=None, default=None, positional=None):
         self.name = name
         self.display_name = nvl(display_name, self.name.replace("_", "-"))
         self.type = type
