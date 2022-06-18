@@ -22,6 +22,8 @@ import sys
 dest_dir = "/"
 prefix = join(get_home_dir(), ".local")
 
+ENV["RPM_BUILD_ROOT"] = "fake" # Working around a Fedora 36 bug
+
 class project_env(working_env):
     def __init__(self):
         home_dir = get_current_dir()
