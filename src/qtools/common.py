@@ -60,12 +60,15 @@ Messages:
   """
 
 class Command:
-    def __init__(self, home, name):
-        self.home = home
+    def __init__(self, name):
         self.name = name
 
-        with open(_os.path.join(self.home, "VERSION.txt")) as f:
-            self.version = f.read()
+        try:
+            from importlib.metadata import version
+        except ImportError:
+            self.version = "[Unknown]"
+        else:
+            self.version = version("ssorj-qtools")
 
         self.parser = _argparse.ArgumentParser()
         self.parser.formatter_class = _argparse.RawDescriptionHelpFormatter
@@ -152,8 +155,8 @@ class CommandError(Exception):
     pass
 
 class MessagingCommand(Command):
-    def __init__(self, home, name, handler):
-        super().__init__(home, name)
+    def __init__(self, name, handler):
+        super().__init__(name)
 
         self.container = _reactor.Container(handler)
 
@@ -341,15 +344,12 @@ class MessagingHandler(_handlers.MessagingHandler):
         cond = event.transport.condition
         self.command.error("{}: {}", cond.name, cond.description)
 
-DONE = object()
-
 class _InputOutputThread(_threading.Thread):
     def __init__(self, command):
         _threading.Thread.__init__(self)
 
         self.command = command
         self.name = self.__class__.__name__
-        self.daemon = True
 
         self.lines = _collections.deque()
         self.lines_cv = _threading.Condition(_threading.Lock())
@@ -360,6 +360,10 @@ class _InputOutputThread(_threading.Thread):
             self.lines_cv.notify()
 
 class _InputThread(_InputOutputThread):
+    def __init__(self, command):
+        super().__init__(command)
+        self.daemon = True
+
     def run(self):
         self.command.ready.wait()
 
@@ -368,7 +372,7 @@ class _InputThread(_InputOutputThread):
                 line = f.readline()
 
                 if line == "":
-                    self.push_line(DONE)
+                    self.push_line("")
                     return
 
                 self.push_line(line[:-1])
@@ -378,6 +382,8 @@ class _InputThread(_InputOutputThread):
         self.command.events.trigger(_reactor.ApplicationEvent("input"))
 
 class _OutputThread(_InputOutputThread):
+    STOP = object()
+
     def run(self):
         self.command.ready.wait()
 
@@ -389,11 +395,14 @@ class _OutputThread(_InputOutputThread):
 
                     line = self.lines.pop()
 
-                    if line is DONE:
+                    if line is self.STOP:
                         return
 
                     f.write(line + "\n")
                     f.flush()
+
+    def stop(self):
+        self.push_line(self.STOP)
 
 def _summarize(entity):
     if isinstance(entity, _proton.Connection):

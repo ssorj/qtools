@@ -17,12 +17,10 @@
 # under the License.
 #
 
-from plano import *
+from .plano import *
 from subprocess import PIPE
 
-home_dir = get_parent_dir(get_parent_dir(get_parent_dir(__file__)))
-test_cert_dir = join(home_dir, "test-certs")
-version_file = join(home_dir, "VERSION.txt")
+test_cert_dir = join(get_parent_dir(__file__), "testcerts")
 
 def start_qmessage(args, **kwargs):
     return start(f"qmessage --verbose {args}", **kwargs)
@@ -94,7 +92,6 @@ class TestServer:
 @test(timeout=5)
 def version():
     result = call("qconnect --version")
-    assert result == read(version_file), (result, read(version_file))
 
 @test(timeout=5)
 def logging():
@@ -180,6 +177,8 @@ def sasl():
 
 @test(timeout=5)
 def tls():
+    # Need to error on failed connections in here
+
     server_cert = join(test_cert_dir, "server-cert.pem")
     server_key = join(test_cert_dir, "server-key.pem")
     client_cert = join(test_cert_dir, "client-cert.pem")
@@ -203,3 +202,8 @@ def tls():
         qreceive_args = "{} --count 1".format(client_args)
 
         run_qsend_and_qreceive(server.url, qsend_args=client_args, qreceive_args=qreceive_args)
+
+def main():
+    import qtools.tests
+
+    PlanoTestCommand(qtools.tests).main()

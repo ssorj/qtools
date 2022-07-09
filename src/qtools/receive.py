@@ -39,8 +39,8 @@ Example usage:
 """
 
 class ReceiveCommand(MessagingCommand):
-    def __init__(self, home_dir):
-        super().__init__(home_dir, "qreceive", _Handler(self))
+    def __init__(self):
+        super().__init__("qreceive", _Handler(self))
 
         self.parser.description = _description + suite_description
         self.parser.epilog = url_epilog + _epilog
@@ -75,7 +75,11 @@ class ReceiveCommand(MessagingCommand):
     def run(self):
         self.output_thread.start()
 
-        super().run()
+        try:
+            super().run()
+        finally:
+            self.output_thread.stop()
+            self.output_thead.join()
 
 class _Handler(MessagingHandler):
     def __init__(self, command):
@@ -131,9 +135,11 @@ class _Handler(MessagingHandler):
         self.command.info("Received {} from {} on {}", message, event.link.source, event.connection)
 
         if self.received_messages == self.command.desired_messages:
-            self.command.output_thread.push_line(DONE)
             self.close(event)
 
     def write_line(self, template="", *args):
         line = template.format(*args)
         self.command.output_thread.push_line(line)
+
+def main():
+    ReceiveCommand().main()

@@ -17,93 +17,55 @@
 # under the License.
 #
 
-import sys
-
-dest_dir = "/"
-prefix = join(get_home_dir(), ".local")
-
-ENV["RPM_BUILD_ROOT"] = "fake" # Working around a Fedora 36 bug
-
-class project_env(working_env):
-    def __init__(self):
-        home_dir = get_current_dir()
-        build_dir = join(home_dir, "build")
-        script_dir = join(build_dir, f"scripts-{sys.version_info.major}.{sys.version_info.minor}")
-
-        env = {
-            "QTOOLS_HOME": home_dir,
-            "PATH": script_dir + ":" + ENV["PATH"],
-            "PYTHONPATH": join(home_dir, "python"),
-        }
-
-        super(project_env, self).__init__(**env)
-
 @command
 def build(app):
-    run("./setup.py build")
-    run("./setup.py check")
+    # check_module("build")
+    # check_module("wheel")
 
-    with project_env():
-        run("qconnect --init-only --debug amqp://localhost/q1", stash=True)
-        run("qsend --init-only --debug amqp://localhost/q1", stash=True)
-        run("qreceive --init-only --debug amqp://localhost/q1", stash=True)
-        run("qrequest --init-only --debug amqp://localhost/q1", stash=True)
-        run("qrespond --init-only --debug amqp://localhost/q1", stash=True)
-        run("qmessage --init-only --debug", stash=True)
-        run("qbroker --init-only --debug", stash=True)
-
-@command
-def install(app, prefix=prefix, dest_dir="/"):
-    run(f"./setup.py install --root {dest_dir} --prefix {prefix}")
-    remove(join(f"{dest_dir}{prefix}", "lib", f"python{sys.version_info.major}.{sys.version_info.minor}"))
-
-@command
-def clean(app):
-    remove("MANIFEST")
-    remove("build")
+    run("python -m build")
 
 @command
 def test(app):
-    with temp_dir() as temp:
-        install(app, prefix=temp)
+    # check_module("venv")
 
-        with working_env(PATH=join(temp, "bin")):
-            run(join(temp, "bin", "qtools-self-test"))
-
-@command
-def test_centos(app):
-    run(f"docker build -f scripts/test-centos.containerfile -t {get_user()}/qtools-test-centos .")
-    run(f"docker run --rm {get_user()}/qtools-test-centos")
-
-@command
-def test_fedora(app):
-    run(f"docker build -f scripts/test-fedora.containerfile -t {get_user()}/qtools-test-fedora .")
-    run(f"docker run --rm {get_user()}/qtools-test-fedora")
-
-@command
-def test_ubuntu(app):
-    run(f"docker build -f scripts/test-ubuntu.containerfile -t {get_user()}/qtools-test-ubuntu .")
-    run(f"docker run --rm {get_user()}/qtools-test-ubuntu")
-
-@command
-def big_test(app):
-    test(app)
-    test_centos(app)
-    test_fedora(app)
-    test_ubuntu(app)
-
-image_tag = "quay.io/ssorj/qtools"
-
-@command
-def build_image(app):
-    run(f"podman build -t {image_tag} .")
-
-@command
-def run_image(app):
-    build_image(app)
-    run(f"podman run -it --net host --rm {image_tag}")
-
-@command
-def push_image(app):
     build(app)
-    run(f"podman push {image_tag}")
+
+    wheel = find_wheel()
+
+    with temp_dir() as dir:
+        run(f"python -m venv {dir}")
+        run(f". {dir}/bin/activate && pip install --force-reinstall {wheel}", shell=True)
+
+        path = call(f". {dir}/bin/activate && command -v qtools-self-test", shell=True).strip()
+        expected_path = f"{dir}/bin/qtools-self-test"
+
+        assert path == expected_path, (path, expected_path)
+
+        run(f". {dir}/bin/activate && qtools-self-test --exclude tls", shell=True)
+
+@command
+def install(app):
+    build(app)
+
+    wheel = find_wheel()
+
+    run(f"pip install --user --force-reinstall {wheel}")
+
+@command
+def clean(app):
+    remove("dist")
+    remove("src/qtools/__pycache__")
+
+@command
+def upload(app):
+    check_program("twine", "pip install twine")
+
+    build(app)
+
+    run("twine upload --repository testpypi dist/*", shell=True)
+
+def find_wheel():
+    for file in list_dir("dist", "ssorj_qtools-*.whl"):
+        return join("dist", file)
+    else:
+        fail("Wheel file not found")

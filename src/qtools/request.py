@@ -39,8 +39,8 @@ Example usage:
 """
 
 class RequestCommand(MessagingCommand):
-    def __init__(self, home_dir):
-        super().__init__(home_dir, "qrequest", _Handler(self))
+    def __init__(self):
+        super().__init__("qrequest", _Handler(self))
 
         self.parser.description = _description + suite_description
         self.parser.epilog = url_epilog + message_epilog + _epilog
@@ -79,13 +79,17 @@ class RequestCommand(MessagingCommand):
             for value in args.message_compat:
                 self.input_thread.push_line(value)
 
-            self.input_thread.push_line(DONE)
+            self.input_thread.push_line("")
 
     def run(self):
         self.input_thread.start()
         self.output_thread.start()
 
-        super().run()
+        try:
+            super().run()
+        finally:
+            self.output_thread.stop()
+            self.output_thread.join()
 
 class _Handler(MessagingHandler):
     def __init__(self, command):
@@ -133,7 +137,7 @@ class _Handler(MessagingHandler):
         except IndexError:
             return
 
-        if line is DONE:
+        if line == "":
             self.done_sending = True
 
             if self.sent_requests == self.received_responses:
@@ -174,5 +178,7 @@ class _Handler(MessagingHandler):
         self.pending_request_ids.remove(event.message.correlation_id)
 
         if self.done_sending and self.sent_requests == self.received_responses:
-            self.command.output_thread.push_line(DONE)
             self.close(event)
+
+def main():
+    RequestCommand().main()

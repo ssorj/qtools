@@ -36,8 +36,8 @@ Example usage:
 """
 
 class MessageCommand(Command):
-    def __init__(self, home_dir):
-        super().__init__(home_dir, "qmessage")
+    def __init__(self):
+        super().__init__("qmessage")
 
         self.parser.description = _description + suite_description
         self.parser.epilog = _epilog
@@ -167,3 +167,6 @@ class MessageCommand(Command):
                 if self.interval is not None:
                     adjusted = max(0, self.interval - (_time.time() - start_time))
                     _time.sleep(adjusted)
+
+def main():
+    MessageCommand().main()

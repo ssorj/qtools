@@ -1,0 +1,29 @@
+[build-system]
+requires = ["setuptools", "setuptools-scm"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "ssorj-qtools"
+version = "1.0.0"
+authors = [
+  {name="Justin Ross", email="jross@apache.org"},
+]
+description = "Command-line tools for sending and receiving AMQP 1.0 messages"
+readme = "README.md"
+license = {file="LICENSE.txt"}
+requires-python = ">=3.6"
+dependencies = ["python-qpid-proton"]
+
+[project.scripts]
+qconnect = "qtools.connect:main"
+qsend = "qtools.send:main"
+qreceive = "qtools.receive:main"
+qrequest = "qtools.request:main"
+qrespond = "qtools.respond:main"
+qmessage = "qtools.message:main"
+qbroker = "qtools.brokerlib:main"
+qtools-self-test = "qtools.tests:main"
+
+[project.urls]
+"Homepage" = "https://github.com/ssorj/qtools"
+"Bug Tracker" = "https://github.com/ssorj/qtools/issues"
