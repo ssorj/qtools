@@ -13,25 +13,6 @@
     $ qmessage --count 10 | qsend amqp://example.net/queue1
     $ qmessage --rate 1 | qrequest amqp://example.net/requests
 
-## Installation
-
-### Dependencies
-
- - python3-qpid-proton
- - python3-distutils
-
-### Installing from source
-
-By default, installs from source go to `$HOME/.local`.  Make sure
-`$HOME/.local/bin` is in your path.
-
-    $ cd quiver/
-    $ ./plano install
-
-Use the `--prefix` option to change the install location.
-
-    $ sudo ./plano install --prefix /usr/local
-
 ## Command-line interface
 
 ### Common arguments

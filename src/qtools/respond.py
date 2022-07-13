@@ -39,8 +39,8 @@ Example usage:
 """
 
 class RespondCommand(MessagingCommand):
-    def __init__(self, home_dir):
-        super().__init__(home_dir, "qrespond", _Handler(self))
+    def __init__(self):
+        super().__init__("qrespond", _Handler(self))
 
         self.parser.description = _description + suite_description
         self.parser.epilog = url_epilog + _epilog
@@ -138,3 +138,6 @@ class _Handler(MessagingHandler):
 
         if self.processed_requests == self.command.desired_messages:
             self.close(event)
+
+def main():
+    RespondCommand().main()

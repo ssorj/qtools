@@ -38,8 +38,8 @@ Example usage:
 """
 
 class SendCommand(MessagingCommand):
-    def __init__(self, home_dir):
-        super().__init__(home_dir, "qsend", _Handler(self))
+    def __init__(self):
+        super().__init__("qsend", _Handler(self))
 
         self.parser.description = _description + suite_description
         self.parser.epilog = url_epilog + message_epilog + _epilog
@@ -74,7 +74,7 @@ class SendCommand(MessagingCommand):
             for value in args.message_compat:
                 self.input_thread.push_line(value)
 
-            self.input_thread.push_line(DONE)
+            self.input_thread.push_line("")
 
     def run(self):
         self.input_thread.start()
@@ -125,7 +125,7 @@ class _Handler(MessagingHandler):
         except IndexError:
             return
 
-        if line is DONE:
+        if line == "":
             self.done_sending = True
 
             if self.command.presettled:
@@ -150,3 +150,6 @@ class _Handler(MessagingHandler):
 
         if self.done_sending and self.sent_messages == self.settled_messages:
             self.close(event)
+
+def main():
+    SendCommand().main()

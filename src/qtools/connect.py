@@ -38,8 +38,8 @@ Example usage:
 """
 
 class ConnectCommand(MessagingCommand):
-    def __init__(self, home_dir):
-        super().__init__(home_dir, "qconnect", _Handler(self))
+    def __init__(self):
+        super().__init__("qconnect", _Handler(self))
 
         self.parser.description = _description
         self.parser.epilog = _epilog
@@ -68,3 +68,6 @@ class _Handler(MessagingHandler):
     def on_transport_error(self, event):
         super().on_transport_error(event)
         self.close(event)
+
+def main():
+    ConnectCommand().main()
