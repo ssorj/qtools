@@ -58,6 +58,10 @@ def clean(app):
 
 @command
 def upload(app):
+    """
+    Upload the package to PyPI
+    """
+
     check_program("twine", "pip install twine")
 
     build(app)

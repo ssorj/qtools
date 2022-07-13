@@ -79,7 +79,7 @@ class ReceiveCommand(MessagingCommand):
             super().run()
         finally:
             self.output_thread.stop()
-            self.output_thead.join()
+            self.output_thread.join()
 
 class _Handler(MessagingHandler):
     def __init__(self, command):
