@@ -17,7 +17,7 @@
 # under the License.
 #
 
-from .plano import *
+from .plano.commands import *
 from subprocess import PIPE
 
 test_cert_dir = join(get_parent_dir(__file__), "testcerts")
