@@ -28,7 +28,7 @@ if os.path.islink(__file__):
 if os.path.isdir("python"):
     sys.path.insert(0, "python")
 
-from plano import PlanoTestCommand
+from plano.commands import PlanoTestCommand
 
 if __name__ == "__main__":
     PlanoTestCommand().main()
