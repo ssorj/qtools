@@ -1,0 +1,3 @@
+include src/plano/testproject/*
+include src/plano/testproject/bin/*
+include src/plano/bullseye.strings

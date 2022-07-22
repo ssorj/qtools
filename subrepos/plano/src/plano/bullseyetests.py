@@ -17,12 +17,11 @@
 # under the License.
 #
 
-from bullseye import *
 from plano import *
+from plano.commands import *
+from plano.bullseye import *
 
-from bullseye import test as test_command
-
-test_project_dir = join(get_parent_dir(get_parent_dir(__file__)), "test-project")
+test_project_dir = join(get_parent_dir(__file__), "testproject")
 result_file = "build/result.json"
 
 class test_project(working_dir):
@@ -49,6 +48,9 @@ def project_operations():
 
 @test
 def build_command():
+    if WINDOWS:
+        raise PlanoTestSkipped("Not ready for Windows")
+
     with test_project():
         run_plano("build")
 
@@ -56,12 +58,12 @@ def build_command():
         assert result["built"], result
 
         check_file("build/bin/chucker")
-        check_file("build/bin/chucker-test")
+        check_file("build/bin/chucker-self-test")
         check_file("build/chucker/python/chucker.py")
-        check_file("build/chucker/python/chucker_tests.py")
+        check_file("build/chucker/python/chuckertests.py")
 
         result = read("build/bin/chucker").strip()
-        assert result.endswith(".local/lib/chucker"), result
+        assert result.endswith(join(".local", "lib", "chucker")), result
 
         result = read_json("build/build.json")
         assert result["prefix"].endswith(".local"), result
@@ -91,6 +93,9 @@ def test_command():
 
 @test
 def install_command():
+    if WINDOWS:
+        raise PlanoTestSkipped("Not ready for Windows")
+
     with test_project():
         run_plano("install", "--staging-dir", "staging")
 

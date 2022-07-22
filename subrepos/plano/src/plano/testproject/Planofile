@@ -1,26 +1,26 @@
-from bullseye import *
+from plano.bullseye import *
 
 app.set_default_command("build", prefix="/tmp/alpha")
 
 project.name = "chucker"
 project.data_dirs = ["files"]
 project.excluded_modules = ["flipper"]
-project.test_modules = ["chucker_tests"]
+project.test_modules = ["chuckertests"]
 
 result_file = "build/result.json"
 
 @command(parent=build)
 def build(app, *args, **kwargs):
-    build.super(app, *args, **kwargs)
+    build.parent.function(app, *args, **kwargs)
 
     notice("Extended building")
 
     data = {"built": True}
     write_json(result_file, data)
 
-@command(parent=test)
-def test(app, *args, **kwargs):
-    test.super(app, *args, **kwargs)
+@command(parent=test_)
+def test_(app, *args, **kwargs):
+    test_.parent.function(app, *args, **kwargs)
 
     notice("Extended testing")
 
@@ -33,7 +33,7 @@ def test(app, *args, **kwargs):
 
 @command(parent=install)
 def install(app, *args, **kwargs):
-    install.super(app, *args, **kwargs)
+    install.parent.function(app, *args, **kwargs)
 
     notice("Extended installing")
 
@@ -48,7 +48,7 @@ def base_command(app, alpha, beta, omega="x"):
 @command(name="extended-command", parent=base_command)
 def extended_command(app, alpha, beta, omega="y"):
     print("extended", alpha, omega)
-    extended_command.super(app, alpha, beta, omega)
+    extended_command.parent.function(app, alpha, beta, omega)
 
 @command(args=(CommandArgument("message_", help="The message to print", display_name="message"),
                CommandArgument("count", help="Print the message COUNT times"),
