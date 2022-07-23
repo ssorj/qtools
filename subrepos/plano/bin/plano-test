@@ -22,11 +22,8 @@ import os
 import sys
 
 if os.path.islink(__file__):
-    source_dir = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
-    sys.path.insert(0, os.path.join(source_dir, "python"))
-
-if os.path.isdir("python"):
-    sys.path.insert(0, "python")
+    repo_dir = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
+    sys.path.insert(0, os.path.join(repo_dir, "src"))
 
 from plano.commands import PlanoTestCommand
 
