@@ -90,9 +90,10 @@ def command_operations():
 
     SomeCommand().main([])
     SomeCommand().main(["--interrupt"])
+    SomeCommand().main(["--debug"])
 
     with expect_system_exit():
-        SomeCommand().main(["--verbose", "--explode"])
+        SomeCommand().main(["--verbose", "--debug", "--explode"])
 
 @test
 def console_operations():
@@ -1038,7 +1039,7 @@ def value_operations():
 def yaml_operations():
     try:
         import yaml as _yaml
-    except ImportError:
+    except ImportError: # pragma: nocover
         raise PlanoTestSkipped("PyYAML is not available")
 
     with working_dir():
@@ -1087,12 +1088,12 @@ def plano_command():
         run_command("--quiet")
         run_command("--init-only")
 
-        run_command("build")
-        run_command("install")
-        run_command("clean")
+        # run_command("build")
+        # run_command("install")
+        # run_command("clean")
 
-        with expect_system_exit():
-            run_command("build", "--help")
+        # with expect_system_exit():
+        #     run_command("build", "--help")
 
         with expect_system_exit():
             run_command("no-such-command")
@@ -1167,5 +1168,4 @@ def planosh_command():
         PlanoShellCommand().main(["no-such-file"])
 
 def main():
-    import plano.bullseyetests as bullseyetests
-    PlanoTestCommand((_sys.modules[__name__], bullseyetests)).main()
+    PlanoTestCommand(_sys.modules[__name__]).main()

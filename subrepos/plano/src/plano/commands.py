@@ -287,11 +287,11 @@ class PlanoShellCommand(BaseCommand):
 if PLANO_DEBUG: # pragma: nocover
     enable_logging(level="debug")
 
-def plano():
+def plano(): # pragma: nocover
     PlanoCommand().main()
 
-def planosh():
+def planosh(): # pragma: nocover
     PlanoShellCommand().main()
 
-def plano_test():
+def plano_test(): # pragma: nocover
     PlanoTestCommand().main()
