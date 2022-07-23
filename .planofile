@@ -19,14 +19,16 @@
 
 @command
 def build(app):
-    # check_module("build")
-    # check_module("wheel")
+    check_module("build")
+    check_module("wheel")
+
+    copy("subrepos/plano/src/plano", "src/qtools/plano")
 
     run("python -m build")
 
 @command
 def test(app):
-    # check_module("venv")
+    check_module("venv")
 
     build(app)
 
