@@ -17,7 +17,7 @@
 # under the License.
 #
 
-from .plano.commands import *
+from .plano import *
 from subprocess import PIPE
 
 test_cert_dir = join(get_parent_dir(__file__), "testcerts")
@@ -204,6 +204,7 @@ def tls():
         run_qsend_and_qreceive(server.url, qsend_args=client_args, qreceive_args=qreceive_args)
 
 def main():
+    from .plano.commands import PlanoTestCommand
     import qtools.tests
 
     PlanoTestCommand(qtools.tests).main()
