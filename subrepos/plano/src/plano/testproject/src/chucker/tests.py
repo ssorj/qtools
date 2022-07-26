@@ -17,5 +17,39 @@
 # under the License.
 #
 
-from .main import *
-from .main import _default_sigterm_handler
+from plano import *
+
+@test
+def hello():
+    print("Hello")
+
+@test
+def goodbye():
+    print("Goodbye")
+
+@test(disabled=True)
+def badbye():
+    print("Badbye")
+    assert False
+
+@test(disabled=True)
+def skipped():
+    skip_test("Skipped")
+    assert False
+
+@test(disabled=True)
+def keyboard_interrupt():
+    raise KeyboardInterrupt()
+
+@test(disabled=True, timeout=0.05)
+def timeout():
+    sleep(10, quiet=True)
+    assert False
+
+@test(disabled=True)
+def process_error():
+    run("expr 1 / 0")
+
+@test(disabled=True)
+def system_exit():
+    exit(1)

@@ -57,3 +57,7 @@ coverage: build
 	coverage3 report
 	coverage3 html
 	@echo file:${CURDIR}/htmlcov/index.html
+
+.PHONY: upload
+upload: build
+	twine upload --repository testpypi dist/*

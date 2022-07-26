@@ -332,8 +332,15 @@ def http_operations():
             self.server.serve_forever()
 
     host, port = "localhost", get_random_port()
-    url = "http://{0}:{1}".format(host, port)
-    server = _http.HTTPServer((host, port), Handler)
+    url = "http://{}:{}".format(host, port)
+
+    try:
+        server = _http.HTTPServer((host, port), Handler)
+    except (OSError, PermissionError):
+        # Try one more time
+        port = get_random_port()
+        server = _http.HTTPServer((host, port), Handler)
+
     server_thread = ServerThread(server)
 
     server_thread.start()
@@ -493,7 +500,7 @@ def logging_operations():
     notice("Take a look!")
     notice(123)
     debug("By the way")
-    debug("abc{0}{1}{2}", 1, 2, 3)
+    debug("abc{}{}{}", 1, 2, 3)
 
     with expect_exception(RuntimeError):
         fail(RuntimeError("Error!"))
@@ -638,7 +645,13 @@ def port_operations():
     server_socket = _socket.socket(_socket.AF_INET, _socket.SOCK_STREAM)
 
     try:
-        server_socket.bind(("localhost", server_port))
+        try:
+            server_socket.bind(("localhost", server_port))
+        except (OSError, PermissionError):
+            # Try one more time
+            server_port = get_random_port()
+            server_socket.bind(("localhost", server_port))
+
         server_socket.listen(5)
 
         await_port(server_port)
@@ -705,12 +718,11 @@ def process_operations():
     with expect_error():
         call("cat /whoa/not/really")
 
-    if PYTHON3:
-        proc = start("sleep 10")
+    proc = start("sleep 10")
 
-        if not WINDOWS:
-            with expect_timeout():
-                wait(proc, timeout=TINY_INTERVAL)
+    if not WINDOWS:
+        with expect_timeout():
+            wait(proc, timeout=TINY_INTERVAL)
 
     proc = start("echo hello")
     sleep(TINY_INTERVAL)
@@ -882,42 +894,47 @@ def temp_operations():
 @test
 def test_operations():
     with test_project():
-        with working_module_path("python"):
+        with working_module_path("src"):
             import chucker
-            import chuckertests
+            import chucker.tests
 
-            print_tests(chuckertests)
+            print_tests(chucker.tests)
 
             for verbose in (False, True):
-                run_tests(chuckertests, verbose=verbose)
-                run_tests(chuckertests, exclude="*hello*", verbose=verbose)
-
+                # Module 'chucker' has no tests
                 with expect_error():
                     run_tests(chucker, verbose=verbose)
 
-                with expect_error():
-                    run_tests(chuckertests, enable="*badbye*", verbose=verbose)
+                run_tests(chucker.tests, verbose=verbose)
+                run_tests(chucker.tests, exclude="*hello*", verbose=verbose)
+                run_tests(chucker.tests, enable="skipped", verbose=verbose)
 
                 with expect_error():
-                    run_tests(chuckertests, enable="*badbye*", fail_fast=True, verbose=verbose)
+                    run_tests(chucker.tests, enable="skipped", unskip="*skipped*", verbose=verbose)
+
+                with expect_error():
+                    run_tests(chucker.tests, enable="*badbye*", verbose=verbose)
+
+                with expect_error():
+                    run_tests(chucker.tests, enable="*badbye*", fail_fast=True, verbose=verbose)
 
                 with expect_exception(KeyboardInterrupt):
-                    run_tests(chuckertests, enable="test_keyboard_interrupt", verbose=verbose)
+                    run_tests(chucker.tests, enable="keyboard_interrupt", verbose=verbose)
 
                 with expect_error():
-                    run_tests(chuckertests, enable="test_timeout", verbose=verbose)
+                    run_tests(chucker.tests, enable="timeout", verbose=verbose)
 
                 with expect_error():
-                    run_tests(chuckertests, enable="test_process_error", verbose=verbose)
+                    run_tests(chucker.tests, enable="process_error", verbose=verbose)
 
                 with expect_error():
-                    run_tests(chuckertests, enable="test_system_exit", verbose=verbose)
+                    run_tests(chucker.tests, enable="system_exit", verbose=verbose)
 
             with expect_system_exit():
                 PlanoTestCommand().main(["--module", "nosuchmodule"])
 
             def run_command(*args):
-                PlanoTestCommand(chuckertests).main(args)
+                PlanoTestCommand(chucker.tests).main(args)
 
             run_command("--verbose")
             run_command("--list")
@@ -1016,10 +1033,10 @@ def value_operations():
     result = format_empty((1,), "[nothing]")
     assert result == (1,), result
 
-    result = format_not_empty("abc", "[{0}]")
+    result = format_not_empty("abc", "[{}]")
     assert result == "[abc]", result
 
-    result = format_not_empty({}, "[{0}]")
+    result = format_not_empty({}, "[{}]")
     assert result == {}, result
 
     result = format_repr(Namespace(a=1, b=2), limit=1)
@@ -1061,9 +1078,6 @@ def yaml_operations():
 
 @test
 def plano_command():
-    if PYTHON2: # pragma: nocover
-        raise PlanoTestSkipped("The plano command is not supported on Python 2")
-
     with working_dir():
         PlanoCommand().main([])
 
@@ -1087,13 +1101,6 @@ def plano_command():
         run_command("--help")
         run_command("--quiet")
         run_command("--init-only")
-
-        # run_command("build")
-        # run_command("install")
-        # run_command("clean")
-
-        # with expect_system_exit():
-        #     run_command("build", "--help")
 
         with expect_system_exit():
             run_command("no-such-command")
@@ -1143,8 +1150,6 @@ def plano_command():
 
 @test
 def planosh_command():
-    python_dir = get_absolute_path("python")
-
     with working_dir():
         write("script1", "garbage")
 
@@ -1156,13 +1161,6 @@ def planosh_command():
         PlanoShellCommand().main(["script2"])
 
         PlanoShellCommand().main(["--command", "print_env()"])
-
-        # if not WINDOWS:
-        #     write("command", "from plano import *; PlanoShellCommand().main()")
-
-        #     with working_env(PYTHONPATH=python_dir):
-        #         run("{0} command".format(_sys.executable), input="cprint('Hi!', color='green'); exit()")
-        #         run("echo \"cprint('Bi!', color='red')\" | {0} command -".format(_sys.executable), shell=True)
 
     with expect_system_exit():
         PlanoShellCommand().main(["no-such-file"])

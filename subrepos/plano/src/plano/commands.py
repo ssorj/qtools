@@ -19,11 +19,11 @@
 
 from .main import *
 from .main import _capitalize_help
-from .main import _import_module
 
 import argparse as _argparse
 import code as _code
 import collections as _collections
+import importlib as _importlib
 import inspect as _inspect
 import os as _os
 import sys as _sys
@@ -39,15 +39,17 @@ class PlanoTestCommand(BaseCommand):
 
         self.parser = BaseArgumentParser()
         self.parser.add_argument("include", metavar="PATTERN", nargs="*", default=["*"],
-                                 help="Run only tests with names matching PATTERN. This option can be repeated.")
+                                 help="Run tests with names matching PATTERN (default '*', all tests)")
         self.parser.add_argument("-e", "--exclude", metavar="PATTERN", action="append", default=[],
-                                 help="Do not run tests with names matching PATTERN. This option can be repeated.")
+                                 help="Do not run tests with names matching PATTERN (repeatable)")
         self.parser.add_argument("-m", "--module", action="append", default=[],
-                                 help="Load tests from MODULE.  This option can be repeated.")
+                                 help="Collect tests from MODULE.  This option can be repeated.")
         self.parser.add_argument("-l", "--list", action="store_true",
                                  help="Print the test names and exit")
         self.parser.add_argument("--enable", metavar="PATTERN", action="append", default=[],
-                                 help="Enable disabled tests matching PATTERN.  This option can be repeated.")
+                                 help=_argparse.SUPPRESS)
+        self.parser.add_argument("--unskip", metavar="PATTERN", action="append", default=[],
+                                 help="Run skipped tests matching PATTERN (repeatable)")
         self.parser.add_argument("--timeout", metavar="SECONDS", type=int, default=300,
                                  help="Fail any test running longer than SECONDS (default 300)")
         self.parser.add_argument("--fail-fast", action="store_true",
@@ -63,13 +65,14 @@ class PlanoTestCommand(BaseCommand):
         self.include_patterns = args.include
         self.exclude_patterns = args.exclude
         self.enable_patterns = args.enable
+        self.unskip_patterns = args.unskip
         self.timeout = args.timeout
         self.fail_fast = args.fail_fast
         self.iterations = args.iterations
 
         try:
             for name in args.module:
-                self.test_modules.append(_import_module(name))
+                self.test_modules.append(_importlib.import_module(name))
         except ImportError as e:
             raise PlanoError(e)
 
@@ -79,8 +82,11 @@ class PlanoTestCommand(BaseCommand):
             return
 
         for i in range(self.iterations):
-            run_tests(self.test_modules, include=self.include_patterns, exclude=self.exclude_patterns, enable=self.enable_patterns,
-                      test_timeout=self.timeout, fail_fast=self.fail_fast, verbose=self.verbose, quiet=self.quiet)
+            run_tests(self.test_modules, include=self.include_patterns,
+                      exclude=self.exclude_patterns,
+                      enable=self.enable_patterns, unskip=self.unskip_patterns,
+                      test_timeout=self.timeout, fail_fast=self.fail_fast,
+                      verbose=self.verbose, quiet=self.quiet)
 
 class PlanoCommand(BaseCommand):
     def __init__(self, planofile=None):
@@ -96,7 +102,8 @@ class PlanoCommand(BaseCommand):
             self.pre_parser.add_argument("-f", "--file",
                                          help="Load commands from FILE (default 'Planofile' or '.planofile')")
 
-        self.parser = _argparse.ArgumentParser(parents=(self.pre_parser,), add_help=False, allow_abbrev=False)
+        self.parser = _argparse.ArgumentParser(parents=(self.pre_parser,),
+                                               description=description, add_help=False, allow_abbrev=False)
 
         self.bound_commands = _collections.OrderedDict()
         self.running_commands = list()
@@ -104,9 +111,6 @@ class PlanoCommand(BaseCommand):
         self.default_command_name = None
         self.default_command_args = None
         self.default_command_kwargs = None
-
-    # def bind_commands(self, module):
-    #     self._bind_commands(vars(module))
 
     def set_default_command(self, name, *args, **kwargs):
         self.default_command_name = name
@@ -122,20 +126,19 @@ class PlanoCommand(BaseCommand):
         return self.parser.parse_args(args)
 
     def init(self, args):
-        # XXX Can this move to the top of run?
-        if args.help or args.command is None and self.default_command_name is None:
-            self.parser.print_help()
-            self.init_only = True
-            return
+        self.help = args.help
+
+        self.selected_command = None
+        self.command_args = list()
+        self.command_kwargs = dict()
 
         if args.command is None:
-            self.selected_command = self.bound_commands[self.default_command_name]
-            self.command_args = self.default_command_args
-            self.command_kwargs = self.default_command_kwargs
+            if self.default_command_name is not None:
+                self.selected_command = self.bound_commands[self.default_command_name]
+                self.command_args = self.default_command_args
+                self.command_kwargs = self.default_command_kwargs
         else:
             self.selected_command = self.bound_commands[args.command]
-            self.command_args = list()
-            self.command_kwargs = dict()
 
             for arg in self.selected_command.args.values():
                 if arg.positional:
@@ -147,11 +150,15 @@ class PlanoCommand(BaseCommand):
                     self.command_kwargs[arg.name] = getattr(args, arg.name)
 
     def run(self):
+        if self.help or self.selected_command is None:
+            self.parser.print_help()
+            return
+
         with Timer() as timer:
             self.selected_command(self, *self.command_args, **self.command_kwargs)
 
         cprint("OK", color="green", file=_sys.stderr, end="")
-        cprint(" ({0})".format(format_duration(timer.elapsed_time)), color="magenta", file=_sys.stderr)
+        cprint(" ({})".format(format_duration(timer.elapsed_time)), color="magenta", file=_sys.stderr)
 
     def _bind_commands(self, scope):
         for var in scope.values():
@@ -166,7 +173,7 @@ class PlanoCommand(BaseCommand):
             planofile = self._find_planofile(planofile)
 
         if planofile is not None and not is_file(planofile):
-            exit("Planofile '{0}' not found", planofile)
+            exit("Planofile '{}' not found", planofile)
 
         if planofile is None:
             planofile = self._find_planofile(get_current_dir())
@@ -174,7 +181,7 @@ class PlanoCommand(BaseCommand):
         if planofile is None:
             return
 
-        debug("Loading '{0}'", planofile)
+        debug("Loading '{}'", planofile)
 
         _sys.path.insert(0, join(get_parent_dir(planofile), "python"))
 
@@ -186,7 +193,7 @@ class PlanoCommand(BaseCommand):
                 exec(f.read(), scope)
         except Exception as e:
             error(e)
-            exit("Failure loading {0}: {1}", repr(planofile), str(e))
+            exit("Failure loading {}: {}", repr(planofile), str(e))
 
         self._bind_commands(scope)
 
@@ -217,17 +224,17 @@ class PlanoCommand(BaseCommand):
                     flag_args = list()
 
                     if arg.short_option is not None:
-                        flag_args.append("-{0}".format(arg.short_option))
+                        flag_args.append("-{}".format(arg.short_option))
 
-                    flag_args.append("--{0}".format(arg.display_name))
+                    flag_args.append("--{}".format(arg.display_name))
 
                     help = arg.help
 
                     if arg.default not in (None, False):
                         if help is None:
-                            help = "Default value is {0}".format(repr(arg.default))
+                            help = "Default value is {}".format(repr(arg.default))
                         else:
-                            help += " (default {0})".format(repr(arg.default))
+                            help += " (default {})".format(repr(arg.default))
 
                     if arg.default is False:
                         subparser.add_argument(*flag_args, dest=arg.name, default=arg.default, action="store_true", help=help)
@@ -283,9 +290,6 @@ class PlanoShellCommand(BaseCommand):
 
         if (self.command is None and self.file is None and stdin_isatty) or self.interactive: # pragma: nocover
             _code.InteractiveConsole(locals=globals()).interact()
-
-if PLANO_DEBUG: # pragma: nocover
-    enable_logging(level="debug")
 
 def plano(): # pragma: nocover
     PlanoCommand().main()
