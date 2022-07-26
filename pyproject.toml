@@ -5,14 +5,13 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "ssorj-qtools"
 version = "1.0.1"
-authors = [
-  {name="Justin Ross", email="jross@apache.org"},
-]
+authors = [ { name = "Justin Ross", email = "jross@apache.org"} ]
 description = "Command-line tools for sending and receiving AMQP 1.0 messages"
+license = { file = "LICENSE.txt" }
 readme = "README.md"
-license = {file="LICENSE.txt"}
-requires-python = ">=3.6"
-dependencies = ["python-qpid-proton"]
+classifiers = [ "License :: OSI Approved :: Apache Software License" ]
+requires-python = ">=3.7"
+dependencies = [ "python-qpid-proton" ]
 
 [project.scripts]
 qconnect = "qtools.connect:main"
