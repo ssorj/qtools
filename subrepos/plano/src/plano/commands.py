@@ -18,112 +18,145 @@
 #
 
 from .main import *
-from .main import _capitalize_help
 
 import argparse as _argparse
-import code as _code
 import collections as _collections
 import importlib as _importlib
 import inspect as _inspect
 import os as _os
 import sys as _sys
+import traceback as _traceback
 
-class PlanoTestCommand(BaseCommand):
-    def __init__(self, test_modules=[]):
-        super(PlanoTestCommand, self).__init__()
+class BaseCommand:
+    def main(self, args=None):
+        if args is None:
+            args = ARGS[1:]
 
-        self.test_modules = test_modules
+        args = self.parse_args(args)
 
-        if _inspect.ismodule(self.test_modules):
-            self.test_modules = [self.test_modules]
+        assert isinstance(args, _argparse.Namespace), args
 
-        self.parser = BaseArgumentParser()
-        self.parser.add_argument("include", metavar="PATTERN", nargs="*", default=["*"],
-                                 help="Run tests with names matching PATTERN (default '*', all tests)")
-        self.parser.add_argument("-e", "--exclude", metavar="PATTERN", action="append", default=[],
-                                 help="Do not run tests with names matching PATTERN (repeatable)")
-        self.parser.add_argument("-m", "--module", action="append", default=[],
-                                 help="Collect tests from MODULE.  This option can be repeated.")
-        self.parser.add_argument("-l", "--list", action="store_true",
-                                 help="Print the test names and exit")
-        self.parser.add_argument("--enable", metavar="PATTERN", action="append", default=[],
-                                 help=_argparse.SUPPRESS)
-        self.parser.add_argument("--unskip", metavar="PATTERN", action="append", default=[],
-                                 help="Run skipped tests matching PATTERN (repeatable)")
-        self.parser.add_argument("--timeout", metavar="SECONDS", type=int, default=300,
-                                 help="Fail any test running longer than SECONDS (default 300)")
-        self.parser.add_argument("--fail-fast", action="store_true",
-                                 help="Exit on the first failure encountered in a test run")
-        self.parser.add_argument("--iterations", metavar="COUNT", type=int, default=1,
-                                 help="Run the tests COUNT times (default 1)")
+        self.verbose = args.verbose or args.debug
+        self.quiet = args.quiet
+        self.debug_enabled = args.debug
+        self.init_only = args.init_only
 
-    def parse_args(self, args):
-        return self.parser.parse_args(args)
+        level = "notice"
 
-    def init(self, args):
-        self.list_only = args.list
-        self.include_patterns = args.include
-        self.exclude_patterns = args.exclude
-        self.enable_patterns = args.enable
-        self.unskip_patterns = args.unskip
-        self.timeout = args.timeout
-        self.fail_fast = args.fail_fast
-        self.iterations = args.iterations
+        if self.verbose:
+            level = "info"
 
-        try:
-            for name in args.module:
-                self.test_modules.append(_importlib.import_module(name))
-        except ImportError as e:
-            raise PlanoError(e)
+        if self.quiet:
+            level = "error"
 
-    def run(self):
-        if self.list_only:
-            print_tests(self.test_modules)
-            return
+        if self.debug_enabled:
+            level = "debug"
 
-        for i in range(self.iterations):
-            run_tests(self.test_modules, include=self.include_patterns,
-                      exclude=self.exclude_patterns,
-                      enable=self.enable_patterns, unskip=self.unskip_patterns,
-                      test_timeout=self.timeout, fail_fast=self.fail_fast,
-                      verbose=self.verbose, quiet=self.quiet)
+        with logging_enabled(level=level):
+            try:
+                self.init(args)
+
+                if self.init_only:
+                    return
+
+                self.run()
+            except KeyboardInterrupt:
+                pass
+            except PlanoError as e:
+                if self.debug_enabled:
+                    _traceback.print_exc()
+                    exit(1)
+                else:
+                    exit(str(e))
+
+    def parse_args(self, args): # pragma: nocover
+        raise NotImplementedError()
+
+    def init(self, args): # pragma: nocover
+        pass
+
+    def run(self): # pragma: nocover
+        raise NotImplementedError()
+
+class BaseArgumentParser(_argparse.ArgumentParser):
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+
+        self.allow_abbrev = False
+        self.formatter_class = _argparse.RawDescriptionHelpFormatter
+
+        self.add_argument("--verbose", action="store_true",
+                          help="Print detailed logging to the console")
+        self.add_argument("--quiet", action="store_true",
+                          help="Print no logging to the console")
+        self.add_argument("--debug", action="store_true",
+                          help="Print debugging output to the console")
+        self.add_argument("--init-only", action="store_true",
+                          help=_argparse.SUPPRESS)
+
+        _capitalize_help(self)
+
+_plano_command = None
 
 class PlanoCommand(BaseCommand):
-    def __init__(self, planofile=None):
-        self.planofile = planofile
+    def __init__(self, module=None, description="Run commands defined as Python functions", epilog=None):
+        self.module = module
+        self.bound_commands = dict()
+        self.running_commands = list()
+        self.passthrough_args = None
 
-        description = "Run commands defined as Python functions"
+        assert self.module is None or _inspect.ismodule(self.module), self.module
 
         self.pre_parser = BaseArgumentParser(description=description, add_help=False)
         self.pre_parser.add_argument("-h", "--help", action="store_true",
                                      help="Show this help message and exit")
 
-        if self.planofile is None:
-            self.pre_parser.add_argument("-f", "--file",
-                                         help="Load commands from FILE (default 'Planofile' or '.planofile')")
+        if self.module is None:
+            self.pre_parser.add_argument("-f", "--file", help="Load commands from FILE (default '.plano.py')")
+            self.pre_parser.add_argument("-m", "--module", help="Load commands from MODULE")
 
         self.parser = _argparse.ArgumentParser(parents=(self.pre_parser,),
-                                               description=description, add_help=False, allow_abbrev=False)
+                                               description=description, epilog=epilog,
+                                               add_help=False, allow_abbrev=False)
 
-        self.bound_commands = _collections.OrderedDict()
-        self.running_commands = list()
+        # This is intentionally added after self.pre_parser is passed
+        # as parent to self.parser, since it is used only in the
+        # preliminary parsing.
+        self.pre_parser.add_argument("command", nargs="?", help=_argparse.SUPPRESS)
 
-        self.default_command_name = None
-        self.default_command_args = None
-        self.default_command_kwargs = None
-
-    def set_default_command(self, name, *args, **kwargs):
-        self.default_command_name = name
-        self.default_command_args = args
-        self.default_command_kwargs = kwargs
+        global _plano_command
+        _plano_command = self
 
     def parse_args(self, args):
         pre_args, _ = self.pre_parser.parse_known_args(args)
 
-        self._load_config(getattr(pre_args, "file", None))
+        if self.module is None:
+            if pre_args.module is None:
+                self.module = self._load_file(pre_args.file)
+            else:
+                self.module = self._load_module(pre_args.module)
+
+        if self.module is not None:
+            self._bind_commands(self.module)
+
         self._process_commands()
 
-        return self.parser.parse_args(args)
+        self.preceding_commands = list()
+
+        if pre_args.command is not None and "," in pre_args.command:
+            names = pre_args.command.split(",")
+
+            for name in names[:-1]:
+                try:
+                    self.preceding_commands.append(self.bound_commands[name])
+                except KeyError:
+                    self.parser.error(f"Command '{name}' is unknown")
+
+            args[args.index(pre_args.command)] = names[-1]
+
+        args, self.passthrough_args = self.parser.parse_known_args(args)
+
+        return args
 
     def init(self, args):
         self.help = args.help
@@ -132,15 +165,19 @@ class PlanoCommand(BaseCommand):
         self.command_args = list()
         self.command_kwargs = dict()
 
-        if args.command is None:
-            if self.default_command_name is not None:
-                self.selected_command = self.bound_commands[self.default_command_name]
-                self.command_args = self.default_command_args
-                self.command_kwargs = self.default_command_kwargs
-        else:
+        if args.command is not None:
+            for command in self.preceding_commands:
+                command()
+
             self.selected_command = self.bound_commands[args.command]
 
+            if not self.selected_command.passthrough and self.passthrough_args:
+                self.parser.error(f"unrecognized arguments: {' '.join(self.passthrough_args)}")
+
             for arg in self.selected_command.args.values():
+                if arg.name == "passthrough_args":
+                    continue
+
                 if arg.positional:
                     if arg.multiple:
                         self.command_args.extend(getattr(args, arg.name))
@@ -149,67 +186,76 @@ class PlanoCommand(BaseCommand):
                 else:
                     self.command_kwargs[arg.name] = getattr(args, arg.name)
 
+            if self.selected_command.passthrough:
+                self.command_kwargs["passthrough_args"] = self.passthrough_args
+
     def run(self):
-        if self.help or self.selected_command is None:
+        if self.help or self.module is None or self.selected_command is None:
             self.parser.print_help()
             return
 
         with Timer() as timer:
-            self.selected_command(self, *self.command_args, **self.command_kwargs)
+            self.selected_command(*self.command_args, **self.command_kwargs)
 
         cprint("OK", color="green", file=_sys.stderr, end="")
         cprint(" ({})".format(format_duration(timer.elapsed_time)), color="magenta", file=_sys.stderr)
 
-    def _bind_commands(self, scope):
-        for var in scope.values():
-            if callable(var) and var.__class__.__name__ == "Command":
-                self.bound_commands[var.name] = var
+    def _load_module(self, name):
+        try:
+            return _importlib.import_module(name)
+        except ImportError:
+            exit("Module '{}' not found", name)
 
-    def _load_config(self, planofile):
-        if planofile is None:
-            planofile = self.planofile
+    def _load_file(self, path):
+        if path is not None and is_dir(path):
+            path = self._find_file(path)
 
-        if planofile is not None and is_dir(planofile):
-            planofile = self._find_planofile(planofile)
+        if path is not None and not is_file(path):
+            exit("File '{}' not found", path)
 
-        if planofile is not None and not is_file(planofile):
-            exit("Planofile '{}' not found", planofile)
+        if path is None:
+            path = self._find_file(get_current_dir())
 
-        if planofile is None:
-            planofile = self._find_planofile(get_current_dir())
-
-        if planofile is None:
+        if path is None:
             return
 
-        debug("Loading '{}'", planofile)
+        debug("Loading '{}'", path)
 
-        _sys.path.insert(0, join(get_parent_dir(planofile), "python"))
+        _sys.path.insert(0, join(get_parent_dir(path), "python"))
 
-        scope = dict(globals())
-        scope["app"] = self
+        spec = _importlib.util.spec_from_file_location("_plano", path)
+        module = _importlib.util.module_from_spec(spec)
+        _sys.modules["_plano"] = module
 
         try:
-            with open(planofile) as f:
-                exec(f.read(), scope)
+            spec.loader.exec_module(module)
         except Exception as e:
             error(e)
-            exit("Failure loading {}: {}", repr(planofile), str(e))
+            exit("Failure loading {}: {}", path, str(e))
 
-        self._bind_commands(scope)
+        return module
 
-    def _find_planofile(self, dir):
-        for name in ("Planofile", ".planofile"):
+    def _find_file(self, dir):
+        # Planofile and .planofile remain temporarily for backward compatibility
+        for name in (".plano.py", "Planofile", ".planofile"):
             path = join(dir, name)
 
             if is_file(path):
                 return path
 
+    def _bind_commands(self, module):
+        for var in vars(module).values():
+            if callable(var) and var.__class__.__name__ == "Command":
+                self.bound_commands[var.name] = var
+
     def _process_commands(self):
         subparsers = self.parser.add_subparsers(title="commands", dest="command")
 
         for command in self.bound_commands.values():
+            add_help = False if command.passthrough else True
+
             subparser = subparsers.add_parser(command.name, help=command.help,
-                                              description=nvl(command.description, command.help),
+                                              description=nvl(command.description, command.help), add_help=add_help,
                                               formatter_class=_argparse.RawDescriptionHelpFormatter)
 
             for arg in command.args.values():
@@ -243,59 +289,203 @@ class PlanoCommand(BaseCommand):
 
             _capitalize_help(subparser)
 
-class PlanoShellCommand(BaseCommand):
-    def __init__(self):
-        self.parser = BaseArgumentParser()
-        self.parser.add_argument("file", metavar="FILE", nargs="?",
-                                 help="Read program from FILE")
-        self.parser.add_argument("arg", metavar="ARG", nargs="*",
-                                 help="Program arguments")
-        self.parser.add_argument("-c", "--command",
-                                 help="A program passed in as a string")
-        self.parser.add_argument("-i", "--interactive", action="store_true",
-                                 help="Operate interactively after running the program (if any)")
+_command_help = {
+    "build":    "Build artifacts from source",
+    "clean":    "Clean up the source tree",
+    "dist":     "Generate distribution artifacts",
+    "install":  "Install the built artifacts on your system",
+    "test":     "Run the tests",
+}
 
-    def parse_args(self, args):
-        return self.parser.parse_args(args)
+def command(_function=None, name=None, args=None, parent=None, passthrough=False):
+    class Command:
+        def __init__(self, function):
+            self.function = function
+            self.module = _inspect.getmodule(self.function)
 
-    def init(self, args):
-        self.file = args.file
-        self.interactive = args.interactive
-        self.command = args.command
+            self.name = name
+            self.args = args
+            self.parent = parent
 
-    def run(self):
-        stdin_isatty = _os.isatty(_sys.stdin.fileno())
-        script = None
+            if self.parent is None:
+                self.name = nvl(self.name, self.function.__name__.rstrip("_").replace("_", "-"))
+                self.args = self.process_args(self.args)
+            else:
+                self.name = nvl(self.name, self.parent.name)
+                self.args = nvl(self.args, self.parent.args)
 
-        if self.file == "-": # pragma: nocover
-            script = _sys.stdin.read()
-        elif self.file is not None:
-            try:
-                with open(self.file) as f:
-                    script = f.read()
-            except IOError as e:
-                raise PlanoError(e)
-        elif not stdin_isatty: # pragma: nocover
-            # Stdin is a pipe
-            script = _sys.stdin.read()
+            doc = _inspect.getdoc(self.function)
 
-        if self.command is not None:
-            exec(self.command, globals())
+            if doc is None:
+                self.help = _command_help.get(self.name)
+                self.description = self.help
+            else:
+                self.help = doc.split("\n")[0]
+                self.description = doc
 
-        if script is not None:
-            global ARGS
-            ARGS = ARGS[1:]
+            if self.parent is not None:
+                self.help = nvl(self.help, self.parent.help)
+                self.description = nvl(self.description, self.parent.description)
 
-            exec(script, globals())
+            self.passthrough = passthrough
 
-        if (self.command is None and self.file is None and stdin_isatty) or self.interactive: # pragma: nocover
-            _code.InteractiveConsole(locals=globals()).interact()
+            debug("Defining {}", self)
 
-def plano(): # pragma: nocover
+            for arg in self.args.values():
+                debug("  {}", str(arg).capitalize())
+
+        def __repr__(self):
+            return "command '{}:{}'".format(self.module.__name__, self.name)
+
+        def process_args(self, input_args):
+            sig = _inspect.signature(self.function)
+            params = list(sig.parameters.values())
+            input_args = {x.name: x for x in nvl(input_args, ())}
+            output_args = _collections.OrderedDict()
+
+            for param in params:
+                try:
+                    arg = input_args[param.name]
+                except KeyError:
+                    arg = CommandArgument(param.name)
+
+                if param.kind is param.POSITIONAL_ONLY: # pragma: nocover
+                    if arg.positional is None:
+                        arg.positional = True
+                elif param.kind is param.POSITIONAL_OR_KEYWORD and param.default is param.empty:
+                    if arg.positional is None:
+                        arg.positional = True
+                elif param.kind is param.POSITIONAL_OR_KEYWORD and param.default is not param.empty:
+                    arg.optional = True
+                    arg.default = param.default
+                elif param.kind is param.VAR_POSITIONAL:
+                    if arg.positional is None:
+                        arg.positional = True
+                    arg.multiple = True
+                elif param.kind is param.VAR_KEYWORD:
+                    continue
+                elif param.kind is param.KEYWORD_ONLY:
+                    arg.optional = True
+                    arg.default = param.default
+                else: # pragma: nocover
+                    raise NotImplementedError(param.kind)
+
+                if arg.type is None and arg.default not in (None, False): # XXX why false?
+                    arg.type = type(arg.default)
+
+                output_args[arg.name] = arg
+
+            return output_args
+
+        def __call__(self, *args, **kwargs):
+            from .commands import _plano_command, PlanoCommand
+            assert isinstance(_plano_command, PlanoCommand), _plano_command
+
+            app = _plano_command
+            command = app.bound_commands[self.name]
+
+            if command is not self:
+                # The command bound to this name has been overridden.
+                # This happens when a parent command invokes a peer
+                # command that is overridden.
+
+                command(*args, **kwargs)
+
+                return
+
+            debug("Running {} {} {}".format(self, args, kwargs))
+
+            app.running_commands.append(self)
+
+            dashes = "--" * len(app.running_commands)
+            display_args = list(self.get_display_args(args, kwargs))
+
+            with console_color("magenta", file=_sys.stderr):
+                eprint("{}> {}".format(dashes, self.name), end="")
+
+                if display_args:
+                    eprint(" ({})".format(", ".join(display_args)), end="")
+
+                eprint()
+
+            self.function(*args, **kwargs)
+
+            cprint("<{} {}".format(dashes, self.name), color="magenta", file=_sys.stderr)
+
+            app.running_commands.pop()
+
+            if app.running_commands:
+                name = app.running_commands[-1].name
+
+                cprint("{}| {}".format(dashes[:-2], name), color="magenta", file=_sys.stderr)
+
+        def get_display_args(self, args, kwargs):
+            for i, arg in enumerate(self.args.values()):
+                if arg.positional:
+                    if arg.multiple:
+                        for va in args[i:]:
+                            yield repr(va)
+                    elif arg.optional:
+                        value = args[i]
+
+                        if value == arg.default:
+                            continue
+
+                        yield repr(value)
+                    else:
+                        yield repr(args[i])
+                else:
+                    value = kwargs.get(arg.name, arg.default)
+
+                    if value == arg.default:
+                        continue
+
+                    if value in (True, False):
+                        value = str(value).lower()
+                    else:
+                        value = repr(value)
+
+                    yield "{}={}".format(arg.display_name, value)
+
+    if _function is None:
+        return Command
+    else:
+        return Command(_function)
+
+def parent(*args, **kwargs):
+    try:
+        f_locals = _inspect.stack()[2].frame.f_locals
+        parent_fn = f_locals["self"].parent.function
+    except:
+        fail("Missing parent command")
+
+    parent_fn(*args, **kwargs)
+
+class CommandArgument:
+    def __init__(self, name, display_name=None, type=None, metavar=None, help=None, short_option=None, default=None, positional=None):
+        self.name = name
+        self.display_name = nvl(display_name, self.name.replace("_", "-"))
+        self.type = type
+        self.metavar = nvl(metavar, self.display_name.upper())
+        self.help = help
+        self.short_option = short_option
+        self.default = default
+        self.positional = positional
+
+        self.optional = False
+        self.multiple = False
+
+    def __repr__(self):
+        return "argument '{}' (default {})".format(self.name, repr(self.default))
+
+# Patch the default help text
+def _capitalize_help(parser):
+    try:
+        for action in parser._actions:
+            if action.help and action.help is not _argparse.SUPPRESS:
+                action.help = capitalize(action.help)
+    except: # pragma: nocover
+        pass
+
+def _main(): # pragma: nocover
     PlanoCommand().main()
-
-def planosh(): # pragma: nocover
-    PlanoShellCommand().main()
-
-def plano_test(): # pragma: nocover
-    PlanoTestCommand().main()

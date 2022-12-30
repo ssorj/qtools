@@ -17,10 +17,10 @@
 # under the License.
 #
 
-app.set_default_command("echo", "hello", count=3)
+from plano import *
 
 @command
-def base_command(app, alpha, beta, omega="x"):
+def base_command(alpha, beta, omega="x"):
     """
     Base command help
     """
@@ -28,14 +28,14 @@ def base_command(app, alpha, beta, omega="x"):
     print("base", alpha, beta, omega)
 
 @command(name="extended-command", parent=base_command)
-def extended_command(app, alpha, beta, omega="y"):
+def extended_command(alpha, beta, omega="y"):
     print("extended", alpha, omega)
-    extended_command.parent.function(app, alpha, beta, omega)
+    parent(alpha, beta, omega)
 
 @command(args=(CommandArgument("message_", help="The message to print", display_name="message"),
                CommandArgument("count", help="Print the message COUNT times"),
                CommandArgument("extra", default=1, short_option="e")))
-def echo(app, message_, count=1, extra=None, trouble=False):
+def echo(message_, count=1, extra=None, trouble=False):
     """
     Print a message to the console
     """
@@ -49,7 +49,11 @@ def echo(app, message_, count=1, extra=None, trouble=False):
        print(message_)
 
 @command
-def haberdash(app, first, *middle, last="bowler"):
+def echoecho(message):
+    echo(message)
+
+@command
+def haberdash(first, *middle, last="bowler"):
     """
     Habberdash command help
     """
@@ -58,7 +62,7 @@ def haberdash(app, first, *middle, last="bowler"):
     write_json("haberdash.json", data)
 
 @command(args=(CommandArgument("optional", positional=True),))
-def balderdash(app, required, optional="malarkey", other="rubbish", **extra_kwargs):
+def balderdash(required, optional="malarkey", other="rubbish", **extra_kwargs):
     """
     Balderdash command help
     """
@@ -66,16 +70,35 @@ def balderdash(app, required, optional="malarkey", other="rubbish", **extra_kwar
     data = [required, optional, other]
     write_json("balderdash.json", data)
 
-try:
-    @command
-    def missing_app_arg():
-        pass
-except:
+@command
+def splasher():
+    write_json("splasher.json", [1])
+
+@command
+def dasher(alpha, beta=123):
     pass
 
-try:
-    @command
-    def misnamed_app_arg(frootum):
-        pass
-except:
-    pass
+@command(passthrough=True)
+def dancer(gamma, omega="abc", passthrough_args=[]):
+    write_json("dancer.json", passthrough_args)
+
+# Vixen's parent calls prancer.  We are testing to ensure the extended
+# prancer (below) is executed.
+
+from plano._tests import prancer, vixen
+
+@command(parent=prancer)
+def prancer():
+    parent()
+
+    notice("Extended prancer")
+
+    write_json("prancer.json", True)
+
+@command(parent=vixen)
+def vixen():
+    parent()
+
+@command
+def no_parent():
+    parent()

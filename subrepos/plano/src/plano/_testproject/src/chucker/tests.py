@@ -1,4 +1,3 @@
-#!/usr/bin/python3
 #
 # Licensed to the Apache Software Foundation (ASF) under one
 # or more contributor license agreements.  See the NOTICE file
@@ -18,14 +17,43 @@
 # under the License.
 #
 
-import os
-import sys
+from plano import *
 
-if os.path.islink(__file__):
-    repo_dir = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
-    sys.path.insert(0, os.path.join(repo_dir, "src"))
+@test
+def hello():
+    print("Hello")
 
-from plano.commands import PlanoShellCommand
+@test
+async def hello_async():
+    print("Hello")
 
-if __name__ == "__main__":
-    PlanoShellCommand().main()
+@test
+def goodbye():
+    print("Goodbye")
+
+@test(disabled=True)
+def badbye():
+    print("Badbye")
+    assert False
+
+@test(disabled=True)
+def skipped():
+    skip_test("Skipped")
+    assert False
+
+@test(disabled=True)
+def keyboard_interrupt():
+    raise KeyboardInterrupt()
+
+@test(disabled=True, timeout=0.05)
+def timeout():
+    sleep(10, quiet=True)
+    assert False
+
+@test(disabled=True)
+def process_error():
+    run("expr 1 / 0")
+
+@test(disabled=True)
+def system_exit_():
+    exit(1)

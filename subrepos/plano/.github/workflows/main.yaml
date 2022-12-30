@@ -11,12 +11,12 @@ jobs:
       matrix:
         os: [macos-latest, ubuntu-latest, windows-latest]
         version: [3.7, 3.x]
-    runs-on: ${{ matrix.os }}
+    runs-on: ${{matrix.os}}
     steps:
       - uses: actions/checkout@v3
       - uses: actions/setup-python@v4
         with:
-          python-version: ${{ matrix.version }}
+          python-version: ${{matrix.version}}
       - run: pip install build wheel
       - run: python -m build
       - run: pip install dist/plano-1.0.0-py3-none-any.whl

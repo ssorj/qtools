@@ -17,1153 +17,381 @@
 # under the License.
 #
 
-import getpass as _getpass
-import os as _os
-import signal as _signal
-import socket as _socket
-import sys as _sys
-import threading as _threading
-
-try:
-    import http.server as _http
-except ImportError: # pragma: nocover
-    import BaseHTTPServer as _http
-
 from .main import *
 from .commands import *
 
-test_project_dir = join(get_parent_dir(__file__), "testproject")
+import argparse as _argparse
+import asyncio as _asyncio
+import fnmatch as _fnmatch
+import importlib as _importlib
+import inspect as _inspect
+import traceback as _traceback
+
+class PlanoTestCommand(BaseCommand):
+    def __init__(self, test_modules=[]):
+        super(PlanoTestCommand, self).__init__()
+
+        self.test_modules = test_modules
+
+        if _inspect.ismodule(self.test_modules):
+            self.test_modules = [self.test_modules]
+
+        self.parser = BaseArgumentParser()
+        self.parser.add_argument("include", metavar="PATTERN", nargs="*", default=["*"],
+                                 help="Run tests with names matching PATTERN (default '*', all tests)")
+        self.parser.add_argument("-e", "--exclude", metavar="PATTERN", action="append", default=[],
+                                 help="Do not run tests with names matching PATTERN (repeatable)")
+        self.parser.add_argument("-m", "--module", action="append", default=[],
+                                 help="Collect tests from MODULE (repeatable)")
+        self.parser.add_argument("-l", "--list", action="store_true",
+                                 help="Print the test names and exit")
+        self.parser.add_argument("--enable", metavar="PATTERN", action="append", default=[],
+                                 help=_argparse.SUPPRESS)
+        self.parser.add_argument("--unskip", metavar="PATTERN", action="append", default=[],
+                                 help="Run skipped tests matching PATTERN (repeatable)")
+        self.parser.add_argument("--timeout", metavar="SECONDS", type=int, default=300,
+                                 help="Fail any test running longer than SECONDS (default 300)")
+        self.parser.add_argument("--fail-fast", action="store_true",
+                                 help="Exit on the first failure encountered in a test run")
+        self.parser.add_argument("--iterations", metavar="COUNT", type=int, default=1,
+                                 help="Run the tests COUNT times (default 1)")
+
+    def parse_args(self, args):
+        return self.parser.parse_args(args)
+
+    def init(self, args):
+        self.list_only = args.list
+        self.include_patterns = args.include
+        self.exclude_patterns = args.exclude
+        self.enable_patterns = args.enable
+        self.unskip_patterns = args.unskip
+        self.timeout = args.timeout
+        self.fail_fast = args.fail_fast
+        self.iterations = args.iterations
 
-class test_project(working_dir):
-    def __enter__(self):
-        dir = super(test_project, self).__enter__()
-        copy(test_project_dir, ".", inside=False)
-        return dir
-
-TINY_INTERVAL = 0.05
-
-@test
-def archive_operations():
-    with working_dir():
-        make_dir("some-dir")
-        touch("some-dir/some-file")
-
-        make_archive("some-dir")
-        assert is_file("some-dir.tar.gz"), list_dir()
-
-        extract_archive("some-dir.tar.gz", output_dir="some-subdir")
-        assert is_dir("some-subdir/some-dir")
-        assert is_file("some-subdir/some-dir/some-file")
-
-        rename_archive("some-dir.tar.gz", "something-else")
-        assert is_file("something-else.tar.gz")
-
-        extract_archive("something-else.tar.gz")
-        assert is_dir("something-else")
-        assert is_file("something-else/some-file")
-
-@test
-def command_operations():
-    class SomeCommand(BaseCommand):
-        def __init__(self):
-            self.parser = BaseArgumentParser()
-            self.parser.add_argument("--interrupt", action="store_true")
-            self.parser.add_argument("--explode", action="store_true")
-
-        def parse_args(self, args):
-            return self.parser.parse_args(args)
-
-        def init(self, args):
-            self.verbose = args.verbose
-            self.interrupt = args.interrupt
-            self.explode = args.explode
-
-        def run(self):
-            if self.verbose:
-                print("Hello")
-
-            if self.interrupt:
-                raise KeyboardInterrupt()
-
-            if self.explode:
-                raise PlanoError("Exploded")
-
-    SomeCommand().main([])
-    SomeCommand().main(["--interrupt"])
-    SomeCommand().main(["--debug"])
-
-    with expect_system_exit():
-        SomeCommand().main(["--verbose", "--debug", "--explode"])
-
-@test
-def console_operations():
-    eprint("Here's a story")
-    eprint("About a", "man named Brady")
-
-    pprint(list_dir())
-    pprint(PlanoProcess, 1, "abc", end="\n\n")
-
-    flush()
-
-    with console_color("red"):
-        print("ALERT")
-
-    print(cformat("AMBER ALERT", color="yellow"))
-    print(cformat("NO ALERT"))
-
-    cprint("CRITICAL ALERT", color="red", bright=True)
-
-@test
-def dir_operations():
-    with working_dir():
-        test_dir = make_dir("some-dir")
-        test_file_1 = touch(join(test_dir, "some-file-1"))
-        test_file_2 = touch(join(test_dir, "some-file-2"))
-
-        result = list_dir(test_dir)
-        assert join(test_dir, result[0]) == test_file_1, (join(test_dir, result[0]), test_file_1)
-
-        result = list_dir(test_dir, "*-file-1")
-        assert result == ["some-file-1"], (result, ["some-file-1"])
-
-        result = list_dir(test_dir, exclude="*-file-1")
-        assert result == ["some-file-2"], (result, ["some-file-2"])
-
-        result = list_dir("some-dir", "*.not-there")
-        assert result == [], result
-
-        with working_dir():
-            result = list_dir()
-            assert result == [], result
-
-        result = find(test_dir)
-        assert result == [test_file_1, test_file_2], (result, [test_file_1, test_file_2])
-
-        result = find(test_dir, "*-file-1")
-        assert result == [test_file_1], (result, [test_file_1])
-
-        result = find(test_dir, exclude="*-file-1")
-        assert result == [test_file_2], (result, [test_file_2])
-
-        with working_dir():
-            result = find()
-            assert result == [], result
-
-    with working_dir():
-        with working_dir("a-dir", quiet=True):
-            touch("a-file")
-
-        curr_dir = get_current_dir()
-        prev_dir = change_dir("a-dir")
-        new_curr_dir = get_current_dir()
-        new_prev_dir = change_dir(curr_dir)
-
-        assert curr_dir == prev_dir, (curr_dir, prev_dir)
-        assert new_curr_dir == new_prev_dir, (new_curr_dir, new_prev_dir)
-
-@test
-def env_operations():
-    result = join_path_var("a", "b", "c", "a")
-    assert result == _os.pathsep.join(("a", "b", "c")), result
-
-    curr_dir = get_current_dir()
-
-    with working_dir("."):
-        assert get_current_dir() == curr_dir, (get_current_dir(), curr_dir)
-
-    result = get_home_dir()
-    assert result == _os.path.expanduser("~"), (result, _os.path.expanduser("~"))
-
-    result = get_home_dir("alice")
-    assert result.endswith("alice"), result
-
-    user = _getpass.getuser()
-    result = get_user()
-    assert result == user, (result, user)
-
-    result = get_hostname()
-    assert result, result
-
-    result = get_program_name()
-    assert result, result
-
-    result = get_program_name("alpha beta")
-    assert result == "alpha", result
-
-    result = get_program_name("X=Y alpha beta")
-    assert result == "alpha", result
-
-    result = which("echo")
-    assert result, result
-
-    with working_env(YES_I_AM_SET=1):
-        check_env("YES_I_AM_SET")
-
-        with expect_error():
-            check_env("NO_I_AM_NOT")
-
-        with working_env(I_AM_SET_NOW=1, amend=False):
-            check_env("I_AM_SET_NOW")
-            assert "YES_I_AM_SET" not in ENV, ENV
-
-    with working_env(SOME_VAR=1):
-        assert ENV["SOME_VAR"] == "1", ENV.get("SOME_VAR")
-
-        with working_env(SOME_VAR=2):
-            assert ENV["SOME_VAR"] == "2", ENV.get("SOME_VAR")
-
-    with expect_error():
-        check_program("not-there")
-
-    with expect_error():
-        check_module("not_there")
-
-    with expect_output(contains="ARGS:") as out:
-        with open(out, "w") as f:
-            print_env(file=f)
-
-@test
-def file_operations():
-    with working_dir():
-        alpha_dir = make_dir("alpha-dir")
-        alpha_file = touch(join(alpha_dir, "alpha-file"))
-        alpha_link = make_link(join(alpha_dir, "alpha-file-link"), "alpha-file")
-        alpha_broken_link = make_link(join(alpha_dir, "broken-link"), "no-such-file")
-
-        beta_dir = make_dir("beta-dir")
-        beta_file = touch(join(beta_dir, "beta-file"))
-        beta_link = make_link(join(beta_dir, "beta-file-link"), "beta-file")
-        beta_broken_link = make_link(join(beta_dir, "broken-link"), join("..", alpha_dir, "no-such-file"))
-        beta_another_link = make_link(join(beta_dir, "broken-link"), join("..", alpha_dir, "alpha-file-link"))
-
-        assert exists(beta_link)
-        assert exists(beta_file)
-
-        with working_dir("beta-dir"):
-            assert is_file(read_link("beta-file-link"))
-
-        copied_file = copy(alpha_file, beta_dir)
-        assert copied_file == join(beta_dir, "alpha-file"), copied_file
-        assert is_file(copied_file), list_dir(beta_dir)
-
-        copied_link = copy(beta_link, join(beta_dir, "beta-file-link-copy"))
-        assert copied_link == join(beta_dir, "beta-file-link-copy"), copied_link
-        assert is_link(copied_link), list_dir(beta_dir)
-
-        copied_dir = copy(alpha_dir, beta_dir)
-        assert copied_dir == join(beta_dir, "alpha-dir"), copied_dir
-        assert is_link(join(copied_dir, "alpha-file-link"))
-
-        moved_file = move(beta_file, alpha_dir)
-        assert moved_file == join(alpha_dir, "beta-file"), moved_file
-        assert is_file(moved_file), list_dir(alpha_dir)
-        assert not exists(beta_file), list_dir(beta_dir)
-
-        moved_dir = move(beta_dir, alpha_dir)
-        assert moved_dir == join(alpha_dir, "beta-dir"), moved_dir
-        assert is_dir(moved_dir), list_dir(alpha_dir)
-        assert not exists(beta_dir)
-
-        gamma_dir = make_dir("gamma-dir")
-        gamma_file = touch(join(gamma_dir, "gamma-file"))
-
-        delta_dir = make_dir("delta-dir")
-        delta_file = touch(join(delta_dir, "delta-file"))
-
-        copy(gamma_dir, delta_dir, inside=False)
-        assert is_file(join("delta-dir", "gamma-file"))
-
-        move(gamma_dir, delta_dir, inside=False)
-        assert is_file(join("delta-dir", "gamma-file"))
-        assert not exists(gamma_dir)
-
-        epsilon_dir = make_dir("epsilon-dir")
-        epsilon_file_1 = touch(join(epsilon_dir, "epsilon-file-1"))
-        epsilon_file_2 = touch(join(epsilon_dir, "epsilon-file-2"))
-        epsilon_file_3 = touch(join(epsilon_dir, "epsilon-file-3"))
-        epsilon_file_4 = touch(join(epsilon_dir, "epsilon-file-4"))
-
-        remove("not-there")
-
-        remove(epsilon_file_2)
-        assert not exists(epsilon_file_2)
-
-        remove(epsilon_dir)
-        assert not exists(epsilon_file_1)
-        assert not exists(epsilon_dir)
-
-        remove([epsilon_file_3, epsilon_file_4])
-        assert not exists(epsilon_file_3)
-        assert not exists(epsilon_file_4)
-
-        file = write("xes", "x" * 10)
-        result = get_file_size(file)
-        assert result == 10, result
-
-@test
-def http_operations():
-    class Handler(_http.BaseHTTPRequestHandler):
-        def do_GET(self):
-            self.send_response(200)
-            self.end_headers()
-            self.wfile.write(b"[1]")
-
-        def do_POST(self):
-            length = int(self.headers["content-length"])
-            content = self.rfile.read(length)
-
-            self.send_response(200)
-            self.end_headers()
-            self.wfile.write(content)
-
-        def do_PUT(self):
-            length = int(self.headers["content-length"])
-            content = self.rfile.read(length)
-
-            self.send_response(200)
-            self.end_headers()
-
-    class ServerThread(_threading.Thread):
-        def __init__(self, server):
-            _threading.Thread.__init__(self)
-            self.server = server
-
-        def run(self):
-            self.server.serve_forever()
-
-    host, port = "localhost", get_random_port()
-    url = "http://{}:{}".format(host, port)
-
-    try:
-        server = _http.HTTPServer((host, port), Handler)
-    except (OSError, PermissionError):
-        # Try one more time
-        port = get_random_port()
-        server = _http.HTTPServer((host, port), Handler)
-
-    server_thread = ServerThread(server)
-
-    server_thread.start()
-
-    try:
-        with working_dir():
-            result = http_get(url)
-            assert result == "[1]", result
-
-            result = http_get(url, insecure=True)
-            assert result == "[1]", result
-
-            result = http_get(url, output_file="a")
-            output = read("a")
-            assert result is None, result
-            assert output == "[1]", output
-
-            result = http_get_json(url)
-            assert result == [1], result
-
-            file_b = write("b", "[2]")
-
-            result = http_post(url, read(file_b), insecure=True)
-            assert result == "[2]", result
-
-            result = http_post(url, read(file_b), output_file="x")
-            output = read("x")
-            assert result is None, result
-            assert output == "[2]", output
-
-            result = http_post_file(url, file_b)
-            assert result == "[2]", result
-
-            result = http_post_json(url, parse_json(read(file_b)))
-            assert result == [2], result
-
-            file_c = write("c", "[3]")
-
-            result = http_put(url, read(file_c), insecure=True)
-            assert result is None, result
-
-            result = http_put_file(url, file_c)
-            assert result is None, result
-
-            result = http_put_json(url, parse_json(read(file_c)))
-            assert result is None, result
-    finally:
-        server.shutdown()
-        server.server_close()
-        server_thread.join()
-
-@test
-def io_operations():
-    with working_dir():
-        input_ = "some-text\n"
-        file_a = write("a", input_)
-        output = read(file_a)
-
-        assert input_ == output, (input_, output)
-
-        pre_input = "pre-some-text\n"
-        post_input = "post-some-text\n"
-
-        prepend(file_a, pre_input)
-        append(file_a, post_input)
-
-        output = tail(file_a, 100)
-        tailed = tail(file_a, 1)
-
-        assert output.startswith(pre_input), (output, pre_input)
-        assert output.endswith(post_input), (output, post_input)
-        assert tailed == post_input, (tailed, post_input)
-
-        input_lines = [
-            "alpha\n",
-            "beta\n",
-            "gamma\n",
-        ]
-
-        file_b = write_lines("b", input_lines)
-        output_lines = read_lines(file_b)
-
-        assert input_lines == output_lines, (input_lines, output_lines)
-
-        pre_lines = ["pre-alpha\n"]
-        post_lines = ["post-gamma\n"]
-
-        prepend_lines(file_b, pre_lines)
-        append_lines(file_b, post_lines)
-
-        output_lines = tail_lines(file_b, 100)
-        tailed_lines = tail_lines(file_b, 1)
-
-        assert output_lines[0] == pre_lines[0], (output_lines[0], pre_lines[0])
-        assert output_lines[4] == post_lines[0], (output_lines[4], post_lines[0])
-        assert tailed_lines[0] == post_lines[0], (tailed_lines[0], post_lines[0])
-
-        file_c = touch("c")
-        assert is_file(file_c), file_c
-
-        file_d = write("d", "front@middle@@middle@back")
-        replace_in_file(file_d, "@middle@", "M", count=1)
-        result = read(file_d)
-        assert result == "frontM@middle@back", result
-
-        file_e = write("e", "123")
-        file_f = write("f", "456")
-        concatenate("g", (file_e, "not-there", file_f))
-        result = read("g")
-        assert result == "123456", result
-
-@test
-def iterable_operations():
-    result = unique([1, 1, 1, 2, 2, 3])
-    assert result == [1, 2, 3], result
-
-    result = skip([1, "", 2, None, 3])
-    assert result == [1, 2, 3], result
-
-    result = skip([1, "", 2, None, 3], 2)
-    assert result == [1, "", None, 3], result
-
-@test
-def json_operations():
-    with working_dir():
-        input_data = {
-            "alpha": [1, 2, 3],
-        }
-
-        file_a = write_json("a", input_data)
-        output_data = read_json(file_a)
-
-        assert input_data == output_data, (input_data, output_data)
-
-        json = read(file_a)
-        parsed_data = parse_json(json)
-        emitted_json = emit_json(input_data)
-
-        assert input_data == parsed_data, (input_data, parsed_data)
-        assert json == emitted_json, (json, emitted_json)
-
-@test
-def link_operations():
-    with working_dir():
-        make_dir("some-dir")
-        path = get_absolute_path(touch("some-dir/some-file"))
-
-        with working_dir("another-dir"):
-            link = make_link("a-link", path)
-            linked_path = read_link(link)
-            assert linked_path.endswith(path), (linked_path, path)
-
-@test
-def logging_operations():
-    error("Error!")
-    warn("Warning!")
-    notice("Take a look!")
-    notice(123)
-    debug("By the way")
-    debug("abc{}{}{}", 1, 2, 3)
-
-    with expect_exception(RuntimeError):
-        fail(RuntimeError("Error!"))
-
-    with expect_error():
-        fail("Error!")
-
-    for level in ("debug", "notice", "warn", "error"):
-        with expect_output(contains="Hello") as out:
-            with logging_disabled():
-                with logging_enabled(level=level, output=out):
-                    log(level, "hello")
-
-    with expect_output(equals="") as out:
-        with logging_enabled(output=out):
-            with logging_disabled():
-                error("Yikes")
-
-@test
-def path_operations():
-    abspath = _os.path.abspath
-    normpath = _os.path.normpath
-
-    with working_dir("/"):
-        result = get_current_dir()
-        expect = abspath(_os.sep)
-        assert result == expect, (result, expect)
-
-        path = "a/b/c"
-        result = get_absolute_path(path)
-        expect = join(get_current_dir(), path)
-        assert result == expect, (result, expect)
-
-    path = "/x/y/z"
-    result = get_absolute_path(path)
-    expect = abspath(path)
-    assert result == expect, (result, expect)
-
-    path = "/x/y/z"
-    assert is_absolute(path)
-
-    path = "x/y/z"
-    assert not is_absolute(path)
-
-    path = "a//b/../c/"
-    result = normalize_path(path)
-    expect = normpath("a/c")
-    assert result == expect, (result, expect)
-
-    path = "/a/../c"
-    result = get_real_path(path)
-    expect = abspath("/c")
-    assert result == expect, (result, expect)
-
-    path = abspath("/a/b")
-    result = get_relative_path(path, "/a/c")
-    expect = normpath("../b")
-    assert result == expect, (result, expect)
-
-    path = abspath("/a/b")
-    result = get_file_url(path)
-    expect = "file:{}".format(path)
-    assert result == expect, (result, expect)
-
-    with working_dir():
-        result = get_file_url("afile")
-        expect = join(get_file_url(get_current_dir()), "afile")
-        assert result == expect, (result, expect)
-
-    path = "/alpha/beta.ext"
-    path_split = "/alpha", "beta.ext"
-    path_split_extension = "/alpha/beta", ".ext"
-    name_split_extension = "beta", ".ext"
-
-    result = join(*path_split)
-    expect = normpath(path)
-    assert result == expect, (result, expect)
-
-    result = split(path)
-    expect = normpath(path_split[0]), normpath(path_split[1])
-    assert result == expect, (result, expect)
-
-    result = split_extension(path)
-    expect = normpath(path_split_extension[0]), normpath(path_split_extension[1])
-    assert result == expect, (result, expect)
-
-    result = get_parent_dir(path)
-    expect = normpath(path_split[0])
-    assert result == expect, (result, expect)
-
-    result = get_base_name(path)
-    expect = normpath(path_split[1])
-    assert result == expect, (result, expect)
-
-    result = get_name_stem(path)
-    expect = normpath(name_split_extension[0])
-    assert result == expect, (result, expect)
-
-    result = get_name_stem("alpha.tar.gz")
-    expect = "alpha"
-    assert result == expect, (result, expect)
-
-    result = get_name_extension(path)
-    expect = normpath(name_split_extension[1])
-    assert result == expect, (result, expect)
-
-    with working_dir():
-        touch("adir/afile")
-
-        check_exists("adir")
-        check_exists("adir/afile")
-        check_dir("adir")
-        check_file("adir/afile")
-
-        with expect_error():
-            check_exists("adir/notafile")
-
-        with expect_error():
-            check_file("adir/notafile")
-
-        with expect_error():
-            check_file("adir")
-
-        with expect_error():
-            check_dir("not-there")
-
-        with expect_error():
-            check_dir("adir/afile")
-
-        await_exists("adir/afile")
-
-        if not WINDOWS:
-            with expect_timeout():
-                await_exists("adir/notafile", timeout=TINY_INTERVAL)
-
-@test
-def port_operations():
-    result = get_random_port()
-    assert result >= 49152 and result <= 65535, result
-
-    server_port = get_random_port()
-    server_socket = _socket.socket(_socket.AF_INET, _socket.SOCK_STREAM)
-
-    try:
         try:
-            server_socket.bind(("localhost", server_port))
-        except (OSError, PermissionError):
-            # Try one more time
-            server_port = get_random_port()
-            server_socket.bind(("localhost", server_port))
-
-        server_socket.listen(5)
-
-        await_port(server_port)
-        await_port(str(server_port))
-
-        check_port(server_port)
-
-        # Non-Linux platforms don't seem to produce the expected
-        # error.
-        if LINUX:
-            with expect_error():
-                get_random_port(min=server_port, max=server_port)
-    finally:
-        server_socket.close()
-
-    if not WINDOWS:
-        with expect_timeout():
-            await_port(get_random_port(), timeout=TINY_INTERVAL)
-
-@test
-def process_operations():
-    result = get_process_id()
-    assert result, result
-
-    proc = run("date")
-    assert proc is not None, proc
-
-    print(repr(proc))
-
-    run("date", stash=True)
-
-    proc = run(["echo", "hello"], check=False)
-    assert proc.exit_code == 0, proc.exit_code
-
-    proc = run("cat /uh/uh", check=False)
-    assert proc.exit_code > 0, proc.exit_code
-
-    with expect_output() as out:
-        run("date", output=out)
-
-    run("date", output=DEVNULL)
-    run("date", stdin=DEVNULL)
-    run("date", stdout=DEVNULL)
-    run("date", stderr=DEVNULL)
-
-    run("echo hello", quiet=True)
-    run("echo hello | cat", shell=True)
-    run(["echo", "hello"], shell=True)
-
-    with expect_error():
-        run("/not/there")
-
-    with expect_error():
-        run("cat /whoa/not/really", stash=True)
-
-    result = call("echo hello").strip()
-    expect = "hello"
-    assert result == expect, (result, expect)
-
-    result = call("echo hello | cat", shell=True).strip()
-    expect = "hello"
-    assert result == expect, (result, expect)
-
-    with expect_error():
-        call("cat /whoa/not/really")
-
-    proc = start("sleep 10")
-
-    if not WINDOWS:
-        with expect_timeout():
-            wait(proc, timeout=TINY_INTERVAL)
-
-    proc = start("echo hello")
-    sleep(TINY_INTERVAL)
-    stop(proc)
-
-    proc = start("sleep 10")
-    stop(proc)
-
-    proc = start("sleep 10")
-    kill(proc)
-    sleep(TINY_INTERVAL)
-    stop(proc)
-
-    proc = start("date --not-there")
-    sleep(TINY_INTERVAL)
-    stop(proc)
-
-    with start("sleep 10"):
-        sleep(TINY_INTERVAL)
-
-    with working_dir():
-        touch("i")
-
-        with start("date", stdin="i", stdout="o", stderr="e"):
-            pass
-
-    with expect_system_exit():
-        exit()
-
-    with expect_system_exit():
-        exit(verbose=True)
-
-    with expect_system_exit():
-        exit("abc")
-
-    with expect_system_exit():
-        exit("abc", verbose=True)
-
-    with expect_system_exit():
-        exit(Exception())
-
-    with expect_system_exit():
-        exit(Exception(), verbose=True)
-
-    with expect_system_exit():
-        exit(123)
-
-    with expect_system_exit():
-        exit(123, verbose=True)
-
-    with expect_system_exit():
-        exit(-123)
-
-    with expect_exception(PlanoException):
-        exit(object())
-
-@test
-def string_operations():
-    result = replace("ab", "a", "b")
-    assert result == "bb", result
-
-    result = replace("aba", "a", "b", count=1)
-    assert result == "bba", result
-
-    result = remove_prefix(None, "xxx")
-    assert result == "", result
-
-    result = remove_prefix("anterior", "ant")
-    assert result == "erior", result
-
-    result = remove_prefix("anterior", "ext")
-    assert result == "anterior", result
-
-    result = remove_suffix(None, "xxx")
-    assert result == "", result
-
-    result = remove_suffix("exterior", "ior")
-    assert result == "exter", result
-
-    result = remove_suffix("exterior", "nal")
-    assert result == "exterior"
-
-    result = shorten("abc", 2)
-    assert result == "ab", result
-
-    result = shorten("abc", None)
-    assert result == "abc", result
-
-    result = shorten("abc", 10)
-    assert result == "abc", result
-
-    result = shorten("ellipsis", 6, ellipsis="...")
-    assert result == "ell...", result
-
-    result = shorten(None, 6)
-    assert result == "", result
-
-    result = plural(None)
-    assert result == "", result
-
-    result = plural("")
-    assert result == "", result
-
-    result = plural("test")
-    assert result == "tests", result
-
-    result = plural("test", 1)
-    assert result == "test", result
-
-    result = plural("bus")
-    assert result == "busses", result
-
-    result = plural("bus", 1)
-    assert result == "bus", result
-
-    result = plural("terminus", 2, "termini")
-    assert result == "termini", result
-
-    result = capitalize(None)
-    assert result == "", result
-
-    result = capitalize("")
-    assert result == "", result
-
-    result = capitalize("hello, Frank")
-    assert result == "Hello, Frank", result
-
-    encoded_result = base64_encode(b"abc")
-    decoded_result = base64_decode(encoded_result)
-    assert decoded_result == b"abc", decoded_result
-
-    encoded_result = url_encode("abc=123&yeah!")
-    decoded_result = url_decode(encoded_result)
-    assert decoded_result == "abc=123&yeah!", decoded_result
-
-@test
-def temp_operations():
-    system_temp_dir = get_system_temp_dir()
-
-    result = make_temp_file()
-    assert result.startswith(system_temp_dir), result
-
-    result = make_temp_file(suffix=".txt")
-    assert result.endswith(".txt"), result
-
-    result = make_temp_dir()
-    assert result.startswith(system_temp_dir), result
-
-    with temp_dir() as d:
-        assert is_dir(d), d
-        list_dir(d)
-
-    with temp_file() as f:
-        assert is_file(f), f
-        write(f, "test")
-
-    with working_dir() as d:
-        assert is_dir(d), d
-        list_dir(d)
-
-    user_temp_dir = get_user_temp_dir()
-    assert user_temp_dir, user_temp_dir
-
-    ENV.pop("XDG_RUNTIME_DIR", None)
-
-    user_temp_dir = get_user_temp_dir()
-    assert user_temp_dir, user_temp_dir
-
-@test
-def test_operations():
-    with test_project():
-        with working_module_path("src"):
-            import chucker
-            import chucker.tests
-
-            print_tests(chucker.tests)
-
-            for verbose in (False, True):
-                # Module 'chucker' has no tests
-                with expect_error():
-                    run_tests(chucker, verbose=verbose)
-
-                run_tests(chucker.tests, verbose=verbose)
-                run_tests(chucker.tests, exclude="*hello*", verbose=verbose)
-                run_tests(chucker.tests, enable="skipped", verbose=verbose)
-
-                with expect_error():
-                    run_tests(chucker.tests, enable="skipped", unskip="*skipped*", verbose=verbose)
-
-                with expect_error():
-                    run_tests(chucker.tests, enable="*badbye*", verbose=verbose)
-
-                with expect_error():
-                    run_tests(chucker.tests, enable="*badbye*", fail_fast=True, verbose=verbose)
-
-                with expect_exception(KeyboardInterrupt):
-                    run_tests(chucker.tests, enable="keyboard_interrupt", verbose=verbose)
-
-                with expect_error():
-                    run_tests(chucker.tests, enable="timeout", verbose=verbose)
-
-                with expect_error():
-                    run_tests(chucker.tests, enable="process_error", verbose=verbose)
-
-                with expect_error():
-                    run_tests(chucker.tests, enable="system_exit", verbose=verbose)
-
-            with expect_system_exit():
-                PlanoTestCommand().main(["--module", "nosuchmodule"])
-
-            def run_command(*args):
-                PlanoTestCommand(chucker.tests).main(args)
-
-            run_command("--verbose")
-            run_command("--list")
-
-            with expect_system_exit():
-                run_command("--enable", "*badbye*")
-
-            with expect_system_exit():
-                run_command("--enable", "*badbye*", "--verbose")
-
-    try:
-        with expect_exception():
-            pass
-        raise Exception() # pragma: nocover
-    except AssertionError:
+            for name in args.module:
+                self.test_modules.append(_importlib.import_module(name))
+        except ImportError as e:
+            raise PlanoError(e)
+
+    def run(self):
+        if self.list_only:
+            print_tests(self.test_modules)
+            return
+
+        for i in range(self.iterations):
+            run_tests(self.test_modules, include=self.include_patterns,
+                      exclude=self.exclude_patterns,
+                      enable=self.enable_patterns, unskip=self.unskip_patterns,
+                      test_timeout=self.timeout, fail_fast=self.fail_fast,
+                      verbose=self.verbose, quiet=self.quiet)
+
+class PlanoTestSkipped(Exception):
+    pass
+
+def test(_function=None, name=None, timeout=None, disabled=False):
+    class Test:
+        def __init__(self, function):
+            self.function = function
+            self.name = nvl(name, self.function.__name__.rstrip("_").replace("_", "-"))
+            self.timeout = timeout
+            self.disabled = disabled
+
+            self.module = _inspect.getmodule(self.function)
+
+            if not hasattr(self.module, "_plano_tests"):
+                self.module._plano_tests = list()
+
+            self.module._plano_tests.append(self)
+
+        def __call__(self, test_run, unskipped):
+            try:
+                ret = self.function()
+
+                if _inspect.iscoroutine(ret):
+                    _asyncio.run(ret)
+            except SystemExit as e:
+                error(e)
+                raise PlanoError("System exit with code {}".format(e))
+
+        def __repr__(self):
+            return "test '{}:{}'".format(self.module.__name__, self.name)
+
+    if _function is None:
+        return Test
+    else:
+        return Test(_function)
+
+def skip_test(reason=None):
+    if _inspect.stack()[2].frame.f_locals["unskipped"]:
+        return
+
+    raise PlanoTestSkipped(reason)
+
+class expect_exception:
+    def __init__(self, exception_type=Exception, contains=None):
+        self.exception_type = exception_type
+        self.contains = contains
+
+    def __enter__(self):
         pass
 
-    with expect_output(equals="abc123", contains="bc12", startswith="abc", endswith="123") as out:
-        write(out, "abc123")
+    def __exit__(self, exc_type, exc_value, traceback):
+        if exc_value is None:
+            assert False, "Never encountered expected exception {}".format(self.exception_type.__name__)
 
-@test
-def time_operations():
-    start_time = get_time()
+        if self.contains is None:
+            return isinstance(exc_value, self.exception_type)
+        else:
+            return isinstance(exc_value, self.exception_type) and self.contains in str(exc_value)
 
-    sleep(TINY_INTERVAL)
+class expect_error(expect_exception):
+    def __init__(self, contains=None):
+        super().__init__(PlanoError, contains=contains)
 
-    assert get_time() - start_time > TINY_INTERVAL
+class expect_timeout(expect_exception):
+    def __init__(self, contains=None):
+        super().__init__(PlanoTimeout, contains=contains)
 
-    with expect_system_exit():
-        with start("sleep 10"):
-            from plano import _default_sigterm_handler
-            _default_sigterm_handler(_signal.SIGTERM, None)
+class expect_system_exit(expect_exception):
+    def __init__(self, contains=None):
+        super().__init__(SystemExit, contains=contains)
 
-    result = format_duration(0.1)
-    assert result == "0.1s", result
+class expect_output(temp_file):
+    def __init__(self, equals=None, contains=None, startswith=None, endswith=None):
+        super().__init__()
+        self.equals = equals
+        self.contains = contains
+        self.startswith = startswith
+        self.endswith = endswith
 
-    result = format_duration(1)
-    assert result == "1s", result
+    def __exit__(self, exc_type, exc_value, traceback):
+        result = read(self.file)
 
-    result = format_duration(1, align=True)
-    assert result == "1.0s", result
+        if self.equals is None:
+            assert len(result) > 0, result
+        else:
+            assert result == self.equals, result
 
-    result = format_duration(60)
-    assert result == "60s", result
+        if self.contains is not None:
+            assert self.contains in result, result
 
-    result = format_duration(3600)
-    assert result == "1h", result
+        if self.startswith is not None:
+            assert result.startswith(self.startswith), result
 
-    with Timer() as timer:
-        sleep(TINY_INTERVAL)
-        assert timer.elapsed_time > TINY_INTERVAL
+        if self.endswith is not None:
+            assert result.endswith(self.endswith), result
 
-    assert timer.elapsed_time > TINY_INTERVAL
+        super().__exit__(exc_type, exc_value, traceback)
 
-    if not WINDOWS:
-        with expect_timeout():
-            with Timer(timeout=TINY_INTERVAL) as timer:
-                sleep(10)
+def print_tests(modules):
+    if _inspect.ismodule(modules):
+        modules = (modules,)
 
-@test
-def unique_id_operations():
-    id1 = get_unique_id()
-    id2 = get_unique_id()
+    for module in modules:
+        for test in module._plano_tests:
+            flags = "(disabled)" if test.disabled else ""
+            print(" ".join((str(test), flags)).strip())
 
-    assert id1 != id2, (id1, id2)
+def run_tests(modules, include="*", exclude=(), enable=(), unskip=(), test_timeout=300,
+              fail_fast=False, verbose=False, quiet=False):
+    if _inspect.ismodule(modules):
+        modules = (modules,)
 
-    result = get_unique_id(1)
-    assert len(result) == 2
+    if is_string(include):
+        include = (include,)
 
-    result = get_unique_id(16)
-    assert len(result) == 32
+    if is_string(exclude):
+        exclude = (exclude,)
 
-@test
-def value_operations():
-    result = nvl(None, "a")
-    assert result == "a", result
+    if is_string(enable):
+        enable = (enable,)
 
-    result = nvl("b", "a")
-    assert result == "b", result
+    if is_string(unskip):
+        enable = (unskip,)
 
-    assert is_string("a")
-    assert not is_string(1)
+    test_run = TestRun(test_timeout=test_timeout, fail_fast=fail_fast, verbose=verbose, quiet=quiet)
 
-    for value in (None, "", (), [], {}):
-        assert is_empty(value), value
+    if verbose:
+        notice("Starting {}", test_run)
+    elif not quiet:
+        cprint("=== Configuration ===", color="cyan")
 
-    for value in (object(), " ", (1,), [1], {"a": 1}):
-        assert not is_empty(value), value
+        props = (
+            ("Modules", format_empty(", ".join([x.__name__ for x in modules]), "[none]")),
+            ("Test timeout", format_duration(test_timeout)),
+            ("Fail fast", fail_fast),
+        )
 
-    result = pformat({"z": 1, "a": 2})
-    assert result == "{'a': 2, 'z': 1}", result
+        print_properties(props)
+        print()
 
-    result = format_empty((), "[nothing]")
-    assert result == "[nothing]", result
+    for module in modules:
+        if verbose:
+            notice("Running tests from module {} (file {})", repr(module.__name__), repr(module.__file__))
+        elif not quiet:
+            cprint("=== Module {} ===".format(repr(module.__name__)), color="cyan")
 
-    result = format_empty((1,), "[nothing]")
-    assert result == (1,), result
+        if not hasattr(module, "_plano_tests"):
+            warn("Module {} has no tests", repr(module.__name__))
+            continue
 
-    result = format_not_empty("abc", "[{}]")
-    assert result == "[abc]", result
+        for test in module._plano_tests:
+            if test.disabled and not any([_fnmatch.fnmatchcase(test.name, x) for x in enable]):
+                continue
 
-    result = format_not_empty({}, "[{}]")
-    assert result == {}, result
+            included = any([_fnmatch.fnmatchcase(test.name, x) for x in include])
+            excluded = any([_fnmatch.fnmatchcase(test.name, x) for x in exclude])
+            unskipped = any([_fnmatch.fnmatchcase(test.name, x) for x in unskip])
 
-    result = format_repr(Namespace(a=1, b=2), limit=1)
-    assert result == "Namespace(a=1)", result
+            if included and not excluded:
+                test_run.tests.append(test)
+                _run_test(test_run, test, unskipped)
 
-    result = Namespace(a=1, b=2)
-    assert result.a == 1, result
-    assert result.b == 2, result
-    assert "a" in result, result
-    assert "c" not in result, result
-    repr(result)
+        if not verbose and not quiet:
+            print()
 
-    other = Namespace(a=1, b=2, c=3)
-    assert result != other, (result, other)
+    total = len(test_run.tests)
+    skipped = len(test_run.skipped_tests)
+    failed = len(test_run.failed_tests)
 
-@test
-def yaml_operations():
-    try:
-        import yaml as _yaml
-    except ImportError: # pragma: nocover
-        raise PlanoTestSkipped("PyYAML is not available")
+    if total == 0:
+        raise PlanoError("No tests ran")
 
-    with working_dir():
-        input_data = {
-            "alpha": [1, 2, 3],
-        }
+    notes = ""
 
-        file_a = write_yaml("a", input_data)
-        output_data = read_yaml(file_a)
+    if skipped != 0:
+        notes = "({} skipped)".format(skipped)
 
-        assert input_data == output_data, (input_data, output_data)
+    if failed == 0:
+        result_message = "All tests passed {}".format(notes).strip()
+    else:
+        result_message = "{} {} failed {}".format(failed, plural("test", failed), notes).strip()
 
-        yaml = read(file_a)
-        parsed_data = parse_yaml(yaml)
-        emitted_yaml = emit_yaml(input_data)
+    if verbose:
+        if failed == 0:
+            notice(result_message)
+        else:
+            error(result_message)
+    elif not quiet:
+        cprint("=== Summary ===", color="cyan")
 
-        assert input_data == parsed_data, (input_data, parsed_data)
-        assert yaml == emitted_yaml, (yaml, emitted_yaml)
+        props = (
+            ("Total", total),
+            ("Skipped", skipped, format_not_empty(", ".join([x.name for x in test_run.skipped_tests]), "({})")),
+            ("Failed", failed, format_not_empty(", ".join([x.name for x in test_run.failed_tests]), "({})")),
+        )
 
-@test
-def plano_command():
-    with working_dir():
-        PlanoCommand().main([])
+        print_properties(props)
+        print()
 
-    with working_dir():
-        write("Planofile", "garbage")
+        cprint("=== RESULT ===", color="cyan")
 
-        with expect_system_exit():
-            PlanoCommand().main([])
+        if failed == 0:
+            cprint(result_message, color="green")
+        else:
+            cprint(result_message, color="red", bright="True")
 
-    with expect_system_exit():
-        PlanoCommand("no-such-file").main([])
+        print()
 
-    with expect_system_exit():
-        PlanoCommand().main(["-f", "no-such-file"])
+    if failed != 0:
+        raise PlanoError(result_message)
 
-    def run_command(*args):
-        PlanoCommand().main(["-f", test_project_dir] + list(args))
+def _run_test(test_run, test, unskipped):
+    if test_run.verbose:
+        notice("Running {}", test)
+    elif not test_run.quiet:
+        print("{:.<65} ".format(test.name + " "), end="")
 
-    with test_project():
-        run_command()
-        run_command("--help")
-        run_command("--quiet")
-        run_command("--init-only")
+    timeout = nvl(test.timeout, test_run.test_timeout)
 
-        with expect_system_exit():
-            run_command("no-such-command")
+    with temp_file() as output_file:
+        try:
+            with Timer(timeout=timeout) as timer:
+                if test_run.verbose:
+                    test(test_run, unskipped)
+                else:
+                    with output_redirected(output_file, quiet=True):
+                        test(test_run, unskipped)
+        except KeyboardInterrupt:
+            raise
+        except PlanoTestSkipped as e:
+            test_run.skipped_tests.append(test)
 
-        with expect_system_exit():
-            run_command("no-such-command", "--help")
+            if test_run.verbose:
+                notice("{} SKIPPED ({})", test, format_duration(timer.elapsed_time))
+            elif not test_run.quiet:
+                _print_test_result("SKIPPED", timer, "yellow")
+                print("Reason: {}".format(str(e)))
+        except Exception as e:
+            test_run.failed_tests.append(test)
 
-        with expect_system_exit():
-            run_command("--help", "no-such-command")
+            if test_run.verbose:
+                _traceback.print_exc()
 
-        run_command("extended-command", "a", "b", "--omega", "z")
+                if isinstance(e, PlanoTimeout):
+                    error("{} **FAILED** (TIMEOUT) ({})", test, format_duration(timer.elapsed_time))
+                else:
+                    error("{} **FAILED** ({})", test, format_duration(timer.elapsed_time))
+            elif not test_run.quiet:
+                if isinstance(e, PlanoTimeout):
+                    _print_test_result("**FAILED** (TIMEOUT)", timer, color="red", bright=True)
+                else:
+                    _print_test_result("**FAILED**", timer, color="red", bright=True)
 
-        with expect_system_exit():
-            run_command("echo")
+                _print_test_error(e)
+                _print_test_output(output_file)
 
-        with expect_exception(contains="Trouble"):
-            run_command("echo", "Hello", "--trouble")
+            if test_run.fail_fast:
+                return True
+        else:
+            test_run.passed_tests.append(test)
 
-        run_command("echo", "Hello", "--count", "5")
+            if test_run.verbose:
+                notice("{} PASSED ({})", test, format_duration(timer.elapsed_time))
+            elif not test_run.quiet:
+                _print_test_result("PASSED", timer)
 
-        with expect_system_exit():
-            run_command("echo", "Hello", "--count", "not-an-int")
+def _print_test_result(status, timer, color="white", bright=False):
+    cprint("{:<7}".format(status), color=color, bright=bright, end="")
+    print("{:>6}".format(format_duration(timer.elapsed_time, align=True)))
 
-        run_command("haberdash", "ballcap", "fedora", "hardhat", "--last", "turban")
-        result = read_json("haberdash.json")
-        assert result == ["ballcap", "fedora", "hardhat", "turban"], result
+def _print_test_error(e):
+    cprint("--- Error ---", color="yellow")
 
-        run_command("haberdash", "ballcap", "--last", "turban")
-        result = read_json("haberdash.json")
-        assert result == ["ballcap", "turban"], result
+    if isinstance(e, PlanoProcessError):
+        print("> {}".format(str(e)))
+    else:
+        lines = _traceback.format_exc().rstrip().split("\n")
+        lines = ["> {}".format(x) for x in lines]
 
-        run_command("haberdash", "ballcap")
-        result = read_json("haberdash.json")
-        assert result == ["ballcap", "bowler"], result
+        print("\n".join(lines))
 
-        run_command("balderdash", "bunk", "poppycock")
-        result = read_json("balderdash.json")
-        assert result == ["bunk", "poppycock", "rubbish"], result
+def _print_test_output(output_file):
+    if get_file_size(output_file) == 0:
+        return
 
-        run_command("balderdash", "bunk")
-        result = read_json("balderdash.json")
-        assert result == ["bunk", "malarkey", "rubbish"], result
+    cprint("--- Output ---", color="yellow")
 
-        run_command("balderdash", "bunk", "--other", "bollocks")
-        result = read_json("balderdash.json")
-        assert result == ["bunk", "malarkey", "bollocks"], result
+    with open(output_file, "r") as out:
+        for line in out:
+            print("> {}".format(line), end="")
 
-@test
-def planosh_command():
-    with working_dir():
-        write("script1", "garbage")
+class TestRun:
+    def __init__(self, test_timeout=None, fail_fast=False, verbose=False, quiet=False):
+        self.test_timeout = test_timeout
+        self.fail_fast = fail_fast
+        self.verbose = verbose
+        self.quiet = quiet
 
-        with expect_exception(NameError):
-            PlanoShellCommand().main(["script1"])
+        self.tests = list()
+        self.skipped_tests = list()
+        self.failed_tests = list()
+        self.passed_tests = list()
 
-        write("script2", "print_env()")
+    def __repr__(self):
+        return format_repr(self)
 
-        PlanoShellCommand().main(["script2"])
-
-        PlanoShellCommand().main(["--command", "print_env()"])
-
-    with expect_system_exit():
-        PlanoShellCommand().main(["no-such-file"])
-
-def main():
-    PlanoTestCommand(_sys.modules[__name__]).main()
+def _main(): # pragma: nocover
+    PlanoTestCommand().main()
