@@ -17,8 +17,10 @@
 # under the License.
 #
 
+from plano import *
+
 @command
-def build(app):
+def build():
     # check_module("build")
     # check_module("wheel")
 
@@ -28,10 +30,10 @@ def build(app):
     run("python -m build")
 
 @command
-def test(app):
+def test():
     # check_module("venv")
 
-    build(app)
+    build()
 
     wheel = find_wheel()
 
@@ -47,27 +49,27 @@ def test(app):
         run(f". {dir}/bin/activate && qtools-self-test --exclude tls", shell=True)
 
 @command
-def install(app):
-    build(app)
+def install():
+    build()
 
     wheel = find_wheel()
 
     run(f"pip install --user --force-reinstall {wheel}")
 
 @command
-def clean(app):
+def clean():
     remove("dist")
-    remove("src/qtools/__pycache__")
+    remove(find(".", "__pycache__"))
 
 @command
-def upload(app):
+def upload():
     """
     Upload the package to PyPI
     """
 
     check_program("twine", "pip install twine")
 
-    build(app)
+    build()
 
     run("twine upload --repository testpypi dist/*", shell=True)
 

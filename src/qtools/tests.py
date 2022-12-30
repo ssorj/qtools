@@ -17,6 +17,8 @@
 # under the License.
 #
 
+import sys
+
 from .plano import *
 from subprocess import PIPE
 
@@ -204,7 +206,4 @@ def tls():
         run_qsend_and_qreceive(server.url, qsend_args=client_args, qreceive_args=qreceive_args)
 
 def main():
-    from .plano.commands import PlanoTestCommand
-    import qtools.tests
-
-    PlanoTestCommand(qtools.tests).main()
+    PlanoTestCommand(sys.modules[__name__]).main()
