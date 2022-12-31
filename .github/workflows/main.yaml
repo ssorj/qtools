@@ -20,4 +20,4 @@ jobs:
       - run: pip install build wheel
       - run: python plano test
         env:
-          PYTHONPATH=subrepos/plano/src
+          PYTHONPATH: subrepos/plano/src
