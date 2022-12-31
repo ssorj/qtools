@@ -38,8 +38,10 @@ def test():
     wheel = find_wheel()
 
     with temp_dir() as dir:
+        print(111, dir)
+
         if WINDOWS:
-            activate_script = f"{dir}\\Scripts\\Activate.ps1"
+            activate_script = f"{dir}/Scripts/Activate.ps1"
         else:
             activate_script = f". {dir}/bin/activate"
 
