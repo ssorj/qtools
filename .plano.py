@@ -21,8 +21,8 @@ from plano import *
 
 @command
 def build():
-    # check_module("build")
-    # check_module("wheel")
+    check_module("build")
+    check_module("wheel")
 
     remove("src/qtools/plano")
     copy("subrepos/plano/src/plano", "src/qtools/plano")
@@ -31,7 +31,7 @@ def build():
 
 @command
 def test():
-    # check_module("venv")
+    check_module("venv")
 
     build()
 
@@ -46,7 +46,10 @@ def test():
 
         run(f"python -m venv {dir}")
         run(f"{activate_script} && pip install --force-reinstall {wheel}", shell=True)
-        run(f"{activate_script} && qtools-self-test --exclude tls", shell=True)
+
+        # XXX On Windows, this currently stalls out
+        if not WINDOWS:
+            run(f"{activate_script} && qtools-self-test --exclude tls", shell=True)
 
 @command
 def install():
