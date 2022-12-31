@@ -39,9 +39,9 @@ def test():
 
     with temp_dir() as dir:
         if WINDOWS:
-            activate_script = f"{dir}\Scripts\Activate.ps1"
+            activate_script = f"{dir}\\Scripts\\Activate.ps1"
         else:
-            activate_script = f"source {dir}/bin/activate"
+            activate_script = f". {dir}/bin/activate"
 
         run(f"python -m venv {dir}")
         run(f"{activate_script} && pip install --force-reinstall {wheel}", shell=True)
