@@ -19,3 +19,5 @@ jobs:
           python-version: ${{matrix.version}}
       - run: pip install build wheel
       - run: python plano test
+        env:
+          PYTHONPATH=subrepos/plano/src
