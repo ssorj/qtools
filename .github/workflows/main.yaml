@@ -18,4 +18,4 @@ jobs:
         with:
           python-version: ${{matrix.version}}
       - run: pip install build wheel
-      - run: ./plano test
+      - run: python plano test
