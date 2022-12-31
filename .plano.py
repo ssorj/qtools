@@ -38,15 +38,14 @@ def test():
     wheel = find_wheel()
 
     with temp_dir() as dir:
+        if WINDOWS:
+            activate_script = f"{dir}\Scripts\Activate.ps1"
+        else:
+            activate_script = f"source {dir}/bin/activate"
+
         run(f"python -m venv {dir}")
-        run(f". {dir}/bin/activate && pip install --force-reinstall {wheel}", shell=True)
-
-        path = call(f". {dir}/bin/activate && command -v qtools-self-test", shell=True).strip()
-        expected_path = f"{dir}/bin/qtools-self-test"
-
-        assert path == expected_path, (path, expected_path)
-
-        run(f". {dir}/bin/activate && qtools-self-test --exclude tls", shell=True)
+        run(f"{activate_script} && pip install --force-reinstall {wheel}", shell=True)
+        run(f"{activate_script} && qtools-self-test --exclude tls", shell=True)
 
 @command
 def install():
