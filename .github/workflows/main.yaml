@@ -18,7 +18,10 @@ jobs:
         with:
           python-version: ${{matrix.version}}
       - run: pip install build wheel
-      - run: python -m build
+      # - run: python -m build
+      - run: python plano build
+        env:
+          PYTHONPATH: subrepos/plano/src
       - run: pip install dist/ssorj_qtools-1.0.1-py3-none-any.whl
       - run: qtools-self-test
 # jobs:
