@@ -40,15 +40,13 @@ def test():
     with temp_dir() as dir:
         run(f"python -m venv {dir}")
         run(f". {dir}/bin/activate && pip install --force-reinstall {wheel}", shell=True)
-        run(f". {dir}/bin/activate && qtools-self-test --exclude tls", shell=True)
+        run(f". {dir}/bin/activate && qtools-self-test", shell=True)
 
 @command
 def install():
     build()
 
     wheel = find_wheel()
-
-    print(111, wheel)
 
     run(f"pip install --user --force-reinstall {wheel}")
 
@@ -71,7 +69,6 @@ def upload():
 
 def find_wheel():
     for name in list_dir("dist", "ssorj_qtools-*.whl"):
-        print(222, name)
         return join("dist", name)
     else:
         fail("Wheel file not found")
