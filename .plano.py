@@ -38,18 +38,9 @@ def test():
     wheel = find_wheel()
 
     with temp_dir() as dir:
-        if WINDOWS:
-            dir = dir.replace("\\", "/")
-            activate_script = f"{dir}/Scripts/Activate.ps1"
-        else:
-            activate_script = f". {dir}/bin/activate"
-
         run(f"python -m venv {dir}")
-        run(f"{activate_script} && pip install --force-reinstall {wheel}", shell=True)
-
-        # XXX On Windows, this currently stalls out
-        if not WINDOWS:
-            run(f"{activate_script} && qtools-self-test --exclude tls", shell=True)
+        run(f". {dir}/bin/activate && pip install --force-reinstall {wheel}", shell=True)
+        run(f". {dir}/bin/activate && qtools-self-test --exclude tls", shell=True)
 
 @command
 def install():
