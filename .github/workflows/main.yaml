@@ -19,7 +19,7 @@ jobs:
           python-version: ${{matrix.version}}
       - run: pip install build wheel
       - run: python -m build
-      - run: pip install dist/qtools-1.0.1-py3-none-any.whl
+      - run: pip install dist/ssorj_qtools-1.0.1-py3-none-any.whl
       - run: qtools-self-test
 # jobs:
 #   main:
