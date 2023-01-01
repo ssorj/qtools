@@ -48,6 +48,8 @@ def install():
 
     wheel = find_wheel()
 
+    print(111, wheel)
+
     run(f"pip install --user --force-reinstall {wheel}")
 
 @command
@@ -68,7 +70,8 @@ def upload():
     run("twine upload --repository testpypi dist/*", shell=True)
 
 def find_wheel():
-    for file in list_dir("dist", "ssorj_qtools-*.whl"):
-        return join("dist", file)
+    for name in list_dir("dist", "ssorj_qtools-*.whl"):
+        print(222, name)
+        return join("dist", name)
     else:
         fail("Wheel file not found")

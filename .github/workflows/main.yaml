@@ -18,7 +18,24 @@ jobs:
         with:
           python-version: ${{matrix.version}}
       - run: pip install build wheel
-      - run: python plano install
-        env:
-          PYTHONPATH: subrepos/plano/src
+      - run: python -m build
+      - run: pip install dist/qtools-1.0.1-py3-none-any.whl
       - run: qtools-self-test
+# jobs:
+#   main:
+#     strategy:
+#       fail-fast: false
+#       matrix:
+#         os: [macos-latest, ubuntu-latest, windows-latest]
+#         version: [3.7, 3.x]
+#     runs-on: ${{matrix.os}}
+#     steps:
+#       - uses: actions/checkout@v3
+#       - uses: actions/setup-python@v4
+#         with:
+#           python-version: ${{matrix.version}}
+#       - run: pip install build wheel
+#       - run: python plano install
+#         env:
+#           PYTHONPATH: subrepos/plano/src
+#       - run: qtools-self-test
