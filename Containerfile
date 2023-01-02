@@ -31,7 +31,7 @@ RUN python plano install
 
 FROM python:alpine AS run
 
-RUN apk add --update openssl-libs-static
+RUN apk add --update --no-cache openssl
 
 RUN addgroup -S fritz && adduser -S fritz -G fritz
 COPY --chown=fritz:fritz --from=build /home/fritz/.local /home/fritz/.local
