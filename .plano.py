@@ -67,6 +67,29 @@ def upload():
 
     run("twine upload --repository testpypi dist/*", shell=True)
 
+@command
+def image_build():
+    check_program("docker")
+
+    run("docker build -t ssorj/qtools .")
+
+@command
+def image_test():
+    check_program("docker")
+
+    build()
+
+    run("docker run -it ssorj/qtools")
+
+@command
+def image_push():
+    check_program("docker")
+
+    build()
+
+    run("docker login quay.io")
+    run("docker push ssorj/qtools docker://quay.io/ssorj/qtools")
+
 def find_wheel():
     for name in list_dir("dist", "ssorj_qtools-*.whl"):
         return join("dist", name)
