@@ -2,16 +2,24 @@
 
 [![main](https://github.com/ssorj/qtools/workflows/main/badge.svg)](https://github.com/ssorj/qtools/actions?query=workflow%3Amain)
 
-    $ qsend amqp://example.net/queue1 hello
-    $ qreceive amqp://example.net/queue1 --count 1
-    hello
+~~~ shell
+$ qsend amqp://example.net/queue1 hello
+$ qreceive amqp://example.net/queue1 --count 1
+hello
 
-    $ qrespond amqp://example.net/requests --upper &
-    $ qrequest amqp://example.net/requests hello
-    HELLO
+$ qrespond amqp://example.net/requests --upper &
+$ qrequest amqp://example.net/requests hello
+HELLO
 
-    $ qmessage --count 10 | qsend amqp://example.net/queue1
-    $ qmessage --rate 1 | qrequest amqp://example.net/requests
+$ qmessage --count 10 | qsend amqp://example.net/queue1
+$ qmessage --rate 1 | qrequest amqp://example.net/requests
+~~~
+
+## Installation
+
+~~~
+pip install --index-url https://test.pypi.org/simple/ ssorj-qtools
+~~~
 
 ## Command-line interface
 
@@ -116,3 +124,35 @@ it.  Usually you pipe it in, like this:
 This is a simple broker implementation that you can use for testing.
 
     qbroker [--host HOST] [--port PORT]
+
+## Using the container image
+
+Pull the Qtools image:
+
+~~~ shell
+$ docker pull quay.io/ssorj/qtools
+~~~
+
+Run the broker:
+
+~~~ shell
+$ docker run -it --net host quay.io/ssorj/qtools qbroker
+broker-328b71e8: Listening for connections on 'localhost:5672'
+broker-328b71e8: Opened connection from client 'qsend-b01fea78'
+broker-328b71e8: Stored Message(priority=4, body='job1') from client 'qsend-b01fea78' on queue 'jobs'
+broker-328b71e8: Forwarded Message(priority=4, body='job1') on queue 'jobs' to client 'qreceive-61c5ad0a'
+broker-328b71e8: Opened connection from client 'qreceive-61c5ad0a'
+~~~
+
+Run client commands:
+
+~~~ shell
+$ docker run -it --net host quay.io/ssorj/qtools qsend jobs job1
+qsend-b01fea78: Created sender for target 'jobs' on server 'broker-328b71e8'
+qsend-b01fea78: Sent 1 message
+
+$ docker run -it --net host quay.io/ssorj/qtools qreceive jobs --count 1
+qreceive-61c5ad0a: Created receiver for source 'jobs' on server 'broker-328b71e8'
+job1
+qreceive-61c5ad0a: Received 1 message
+~~~

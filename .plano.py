@@ -31,6 +31,7 @@ def build():
 
 @command
 def test():
+    check_program("pip")
     check_module("venv")
 
     build()
@@ -44,11 +45,19 @@ def test():
 
 @command
 def install():
+    check_program("pip")
+
     build()
 
     wheel = find_wheel()
 
     run(f"pip install --user --force-reinstall {wheel}")
+
+def find_wheel():
+    for name in list_dir("dist", "ssorj_qtools-*.whl"):
+        return join("dist", name)
+    else:
+        fail("Wheel file not found")
 
 @command
 def clean():
@@ -89,9 +98,3 @@ def image_push():
 
     run("docker login quay.io")
     run("docker push ssorj/qtools docker://quay.io/ssorj/qtools")
-
-def find_wheel():
-    for name in list_dir("dist", "ssorj_qtools-*.whl"):
-        return join("dist", name)
-    else:
-        fail("Wheel file not found")
