@@ -53,7 +53,7 @@ pip install --index-url https://test.pypi.org/simple/ ssorj-qtools
 ### Common arguments
 
 The messaging commands take a URL indicating the location of a message
-source or target, such as a queue or topic.
+queue or topic.
 
     qsend URL [MESSAGE ...]
 
@@ -63,8 +63,8 @@ is `amqp`, and the default host and port are `localhost:5672`.
     [SCHEME:][//HOST[:PORT]/]ADDRESS
 
 The send and request commands take message content from the optional
-`MESSAGE` arguments (one message per argument) or from standard input
-or a file (one message per line).
+`MESSAGE` arguments (one message per argument), from standard input
+(one message per line), or from a file (one message per line).
 
 The receive and respond commands run forever unless you use the
 `--count` option to tell them to stop after processing a given number
