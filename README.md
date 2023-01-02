@@ -2,17 +2,44 @@
 
 [![main](https://github.com/ssorj/qtools/workflows/main/badge.svg)](https://github.com/ssorj/qtools/actions?query=workflow%3Amain)
 
+Qtools is a collection of command-line programs for sending and
+receiving AMQP messages.
+
+Start a test broker (or use your own instead):
+
 ~~~ shell
-$ qsend amqp://example.net/queue1 hello
-$ qreceive amqp://example.net/queue1 --count 1
-hello
+$ qbroker
+broker-b39f903f: Listening for connections on 'localhost:5672'
+~~~
 
-$ qrespond amqp://example.net/requests --upper &
-$ qrequest amqp://example.net/requests hello
+Make a client connection:
+
+~~~
+$ qconnect amqp://localhost:5672
+qconnect-bcd96594: Connected to server 'broker-b39f903f'
+~~~
+
+Send and receive messages:
+
+~~~ shell
+$ qsend amqp://localhost:5672/jobs job1
+$ qreceive amqp://localhost:5672/jobs --count 1
+job1
+~~~
+
+Send requests, process them, and return responses:
+
+~~~ shell
+$ qrespond amqp://localhost:5672/requests --upper &
+$ qrequest amqp://localhost:5672/requests hello
 HELLO
+~~~
 
-$ qmessage --count 10 | qsend amqp://example.net/queue1
-$ qmessage --rate 1 | qrequest amqp://example.net/requests
+Generate messages of different kinds for sending:
+
+~~~ shell
+$ qmessage --count 10 | qsend jobs
+$ qmessage --rate 1 | qrequest requests
 ~~~
 
 ## Installation
