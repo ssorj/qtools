@@ -168,9 +168,11 @@ class MessagingCommand(Command):
         self.container.selectable(self.events)
 
         self.input_file = _sys.stdin
+        self.input_path = None
         self.input_thread = _InputThread(self)
 
         self.output_file = _sys.stdout
+        self.output_path = None
         self.output_thread = _OutputThread(self)
 
         self.ready = _threading.Event()

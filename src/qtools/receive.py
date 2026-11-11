@@ -64,11 +64,12 @@ class ReceiveCommand(MessagingCommand):
         self.annotations_enabled = args.annotations
         self.properties_enabled = args.properties
         self.desired_messages = args.count
-
-        if args.output is not None:
-            self.output_file = open(args.output, "w")
+        self.output_path = args.output
 
     def run(self):
+        if self.output_path is not None:
+            self.output_file = open(self.output_path, "w")
+
         self.output_thread.start()
 
         try:

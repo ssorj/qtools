@@ -197,6 +197,24 @@ def test_logging():
     run(["qconnect", "--init-only", "--verbose"])
     run(["qconnect", "--init-only", "--debug"])
 
+def test_missing_input_file_is_a_clean_error(tmp_path):
+    missing = tmp_path / "missing"
+
+    result = run(["qsend", "//localhost:1/queue1", "--input", str(missing)],
+                 check=False, stderr=subprocess.PIPE)
+
+    assert result.returncode != 0
+    assert "File '{}' not found".format(missing) in result.stderr
+    assert "Traceback" not in result.stderr
+
+def test_init_only_does_not_open_output(tmp_path):
+    output = tmp_path / "output"
+    output.write_text("existing\n")
+
+    run(["qmessage", "--init-only", "--output", str(output)])
+
+    assert output.read_text() == "existing\n"
+
 def test_ready_file(tmp_path):
     with BrokerServer() as server:
         ready = tmp_path / "send-ready"

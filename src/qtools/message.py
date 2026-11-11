@@ -75,6 +75,7 @@ class MessageCommand(Command):
                                    help="Set an application property. This option can be repeated.")
 
         self.output_file = _sys.stdout
+        self.output_path = None
 
     def init(self, args):
         super().init(args)
@@ -93,8 +94,7 @@ class MessageCommand(Command):
             if self.max_count is None:
                 self.max_count = -1
 
-        if args.output is not None:
-            self.output_file = open(args.output, "w")
+        self.output_path = args.output
 
         self.init_message(args)
 
@@ -145,6 +145,9 @@ class MessageCommand(Command):
         self.id_prefix = unique_id()
 
     def run(self):
+        if self.output_path is not None:
+            self.output_file = open(self.output_path, "w")
+
         count = 0
 
         with self.output_file as f:

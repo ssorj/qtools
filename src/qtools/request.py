@@ -66,10 +66,10 @@ class RequestCommand(MessagingCommand):
         self.use_input_thread = not (args.message or args.message_compat)
 
         if self.use_input_thread and args.input is not None:
-            self.input_file = open(args.input, "r")
+            self.check_file(args.input)
+            self.input_path = args.input
 
-        if args.output is not None:
-            self.output_file = open(args.output, "w")
+        self.output_path = args.output
 
         if not self.use_input_thread:
             for value in args.message:
@@ -82,7 +82,13 @@ class RequestCommand(MessagingCommand):
 
     def run(self):
         if self.use_input_thread:
+            if self.input_path is not None:
+                self.input_file = open(self.input_path, "r")
+
             self.input_thread.start()
+
+        if self.output_path is not None:
+            self.output_file = open(self.output_path, "w")
 
         self.output_thread.start()
 
