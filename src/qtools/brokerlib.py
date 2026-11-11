@@ -254,6 +254,7 @@ class _Topic:
         assert link not in self.consumers
 
         self.consumers.append(link)
+        self.consumer_offsets[link] = 0
 
         self.broker.info("Added consumer for {0} to {1}", _container_repr(link.connection), self)
 
@@ -265,23 +266,25 @@ class _Topic:
         except ValueError:
             return
 
-        try:
-            del self.consumer_offsets[link]
-        except KeyError:
-            return
+        self.consumer_offsets.pop(link, None)
 
         self.broker.info("Removed consumer for {0} from {1}", _container_repr(link.connection), self)
+
+        self._trim_messages()
 
     def store_message(self, delivery, message):
         self.messages.append(message)
 
         self.broker.notice("Stored {0} from {1} on {2}", message, _container_repr(delivery.connection), self)
 
+        self._trim_messages()
+
     def forward_messages(self):
         credit = sum([x.credit for x in self.consumers])
         sent = 0
 
         if credit == 0:
+            self._trim_messages()
             return
 
         while sent < credit:
@@ -295,6 +298,7 @@ class _Topic:
                     message = self.messages[offset]
                 except IndexError:
                     self.consumers.rotate(sent)
+                    self._trim_messages()
                     return
 
                 consumer.send(message)
@@ -305,6 +309,24 @@ class _Topic:
                 self.broker.notice("Forwarded {0} on {1} to {2}", message, self, _container_repr(consumer.connection))
 
         self.consumers.rotate(sent)
+        self._trim_messages()
+
+    def _trim_messages(self):
+        if not self.consumers:
+            self.messages.clear()
+            self.consumer_offsets.clear()
+            return
+
+        offset = min(self.consumer_offsets[x] for x in self.consumers)
+
+        if offset < 1:
+            return
+
+        for _ in range(offset):
+            self.messages.popleft()
+
+        for consumer in self.consumers:
+            self.consumer_offsets[consumer] -= offset
 
 class _Handler(_handlers.MessagingHandler):
     def __init__(self, broker):
