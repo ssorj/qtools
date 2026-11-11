@@ -17,10 +17,6 @@
 # under the License.
 #
 
-import proton as _proton
-import proton.reactor as _reactor
-import sys as _sys
-
 from .common import *
 
 _description = "Connect to an AMQP server"

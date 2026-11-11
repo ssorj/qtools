@@ -19,9 +19,6 @@
 
 import argparse as _argparse
 import json as _json
-import proton as _proton
-import proton.reactor as _reactor
-import sys as _sys
 
 from .common import *
 

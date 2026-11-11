@@ -18,10 +18,6 @@
 #
 
 import json as _json
-import os as _os
-import proton as _proton
-import proton.reactor as _reactor
-import sys as _sys
 
 from .common import *
 
@@ -102,7 +98,6 @@ class _Handler(MessagingHandler):
         self.received_messages += 1
 
         message = event.message
-        extra_info = False
 
         if self.command.annotations_enabled:
             if message.instructions is not None:

@@ -26,7 +26,6 @@ import proton.handlers as _handlers
 import proton.reactor as _reactor
 import sys as _sys
 import threading as _threading
-import time as _time
 import traceback as _traceback
 import urllib.parse as _urlparse
 import uuid as _uuid
@@ -135,9 +134,9 @@ class Command:
         except CommandError as e:
             if self.debug_enabled:
                 _traceback.print_exc()
-                exit(1)
+                _sys.exit(1)
             else:
-                exit(str(e))
+                _sys.exit(str(e))
 
     def init(self, args):
         self.quiet = args.quiet
@@ -372,7 +371,7 @@ class MessagingHandler(_handlers.MessagingHandler):
 
 class _InputOutputThread(_threading.Thread):
     def __init__(self, command):
-        _threading.Thread.__init__(self)
+        super().__init__()
 
         self.command = command
         self.name = self.__class__.__name__
@@ -528,7 +527,7 @@ def _set_message_attribute(message, mname, data, dname):
     setattr(message, mname, value)
 
 def convert_message_to_data(message):
-    data = _collections.OrderedDict()
+    data = {}
 
     _set_data_attribute(data, "id", message, "id")
     _set_data_attribute(data, "correlation_id", message, "correlation_id")
@@ -546,7 +545,7 @@ def convert_message_to_data(message):
         _set_data_attribute(data, "ttl", message, "ttl")
 
     if message.properties:
-        props = data["properties"] = _collections.OrderedDict()
+        props = data["properties"] = {}
 
         for name in message.properties:
             props[name] = message.properties[name]

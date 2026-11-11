@@ -235,7 +235,7 @@ class _Queue:
 
         self.consumers.rotate(sent)
 
-class _Topic(object):
+class _Topic:
     def __init__(self, broker, address):
         self.broker = broker
         self.address = address
@@ -308,7 +308,7 @@ class _Topic(object):
 
 class _Handler(_handlers.MessagingHandler):
     def __init__(self, broker):
-        super(_Handler, self).__init__()
+        super().__init__()
 
         self.broker = broker
 

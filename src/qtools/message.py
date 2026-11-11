@@ -17,7 +17,6 @@
 # under the License.
 #
 
-import collections as _collections
 import json as _json
 import proton as _proton
 import sys as _sys
@@ -126,7 +125,7 @@ class MessageCommand(Command):
 
             self.message.ttl = ttl
 
-        self.message.properties = _collections.OrderedDict()
+        self.message.properties = {}
 
         if args.property is not None:
             for name, value in args.property:

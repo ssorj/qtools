@@ -29,20 +29,7 @@ import pytest
 
 COMMANDS = ("qbroker", "qconnect", "qmessage", "qreceive", "qrequest", "qrespond", "qsend")
 
-def _find_test_cert_dir():
-    # Prefer the source tree when it is available, so the tests can run
-    # without installing the package first.  Fall back to the installed
-    # package for runs from a wheel.
-    source_dir = Path(__file__).resolve().parent.parent / "src" / "qtools" / "testcerts"
-
-    if source_dir.is_dir():
-        return source_dir
-
-    import qtools
-
-    return Path(qtools.__file__).resolve().parent / "testcerts"
-
-test_cert_dir = _find_test_cert_dir()
+test_cert_dir = Path(__file__).resolve().parent / "testcerts"
 
 @pytest.fixture(scope="session", autouse=True)
 def check_commands():
@@ -237,6 +224,7 @@ def test_qconnect():
     # here.)
     run(["qconnect", "--verbose", "no-such-host"], check=False, timeout=20)
 
+@pytest.mark.tls
 def test_connect_config(tmp_path, monkeypatch):
     server_cert = test_cert_dir / "server-cert.pem"
     server_key = test_cert_dir / "server-key.pem"

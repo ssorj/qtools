@@ -57,6 +57,3 @@ include-package-data = false
 
 [tool.setuptools.packages.find]
 where = [ "src" ]
-
-[tool.setuptools.package-data]
-qtools = [ "testcerts/*.pem" ]

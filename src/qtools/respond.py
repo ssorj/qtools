@@ -18,10 +18,6 @@
 #
 
 import proton as _proton
-import proton.handlers as _handlers
-import proton.reactor as _reactor
-import runpy as _runpy
-import sys as _sys
 import traceback as _traceback
 
 from .common import *
