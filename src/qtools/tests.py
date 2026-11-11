@@ -17,6 +17,7 @@
 # under the License.
 #
 
+import json
 import sys
 
 from .plano import *
@@ -83,6 +84,7 @@ class TestServer:
         args = " ".join(["--{} {}".format(k, v) for k, v in extra_args.items()])
 
         self.proc = start(f"qbroker --verbose --port {port} {args}")
+        self.proc.port = port
         self.proc.url = f"//localhost:{port}/queue1"
 
     def __enter__(self):
@@ -134,6 +136,56 @@ def qconnect():
             run("qconnect --verbose no-such-host")
         except:
             pass
+
+@test(timeout=10)
+def connect_config():
+    server_cert = join(test_cert_dir, "server-cert.pem")
+    server_key = join(test_cert_dir, "server-key.pem")
+    client_cert_and_key = join(test_cert_dir, "client-cert-and-key.pem")
+
+    with TestServer(cert=server_cert, key=server_key) as server:
+        config = {
+            "scheme": "amqps",
+            "host": "localhost",
+            "port": server.port,
+            "tls": {
+                "cert": client_cert_and_key,
+                "key": client_cert_and_key,
+                "ca": server_cert,
+                "verify": False,
+            },
+        }
+
+        with temp_file() as config_file:
+            with open(config_file, "w") as f:
+                json.dump(config, f)
+
+            with temp_file() as output:
+                with working_env(MESSAGING_CONNECT_FILE=config_file):
+                    run("qconnect --verbose", output=output)
+
+                log = read(output)
+                assert "Connected to server" in log, log
+
+@test(timeout=10)
+def connect_config_messaging():
+    with TestServer() as server:
+        config = {
+            "scheme": "amqp",
+            "host": "localhost",
+            "port": server.port,
+        }
+
+        with temp_file() as config_file:
+            with open(config_file, "w") as f:
+                json.dump(config, f)
+
+            with working_env(MESSAGING_CONNECT_FILE=config_file):
+                result = run_qsend_and_qreceive("queue1", "--body abc123", "", "--count 1")
+                assert result == "abc123", result
+
+                result = run_qrequest_and_qrespond("queue1", "--body abc123", "", "--count 1 --reverse --upper")
+                assert result == "321CBA", result
 
 @test(timeout=5)
 def qsend_and_qreceive():

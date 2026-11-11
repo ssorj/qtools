@@ -226,12 +226,16 @@ class MessagingCommand(Command):
             self.tls_key = self.tls_cert
 
         self.ready_file = args.ready_file
+        self.connect_config_path = None
 
     def parse_url(self, string):
         url = _urlparse.urlparse(string)
 
         if url.path is None:
             self.fail("The URL has no path")
+
+        if not url.scheme and url.hostname is None and url.port is None:
+            self.connect_config_path = connect_config_path()
 
         scheme = url.scheme
         host = url.hostname
@@ -260,6 +264,20 @@ class MessagingCommand(Command):
     def run(self):
         self.container.run()
 
+def connect_config_path():
+    path = _os.environ.get("MESSAGING_CONNECT_FILE")
+
+    if path:
+        return path if _os.path.isfile(path) else None
+
+    for directory in (".", _os.path.expanduser("~/.config/messaging"), "/etc/messaging"):
+        path = _os.path.join(directory, "connect.json")
+
+        if _os.path.isfile(path):
+            return path
+
+    return None
+
 class MessagingHandler(_handlers.MessagingHandler):
     def __init__(self, command, **kwargs):
         super().__init__(**kwargs)
@@ -272,6 +290,14 @@ class MessagingHandler(_handlers.MessagingHandler):
         self.open(event)
 
     def open(self, event):
+        if self.command.connect_config_path is not None:
+            self.command.info("Using connection configuration in {}",
+                              self.command.connect_config_path)
+            self.connection = event.container.connect(user=self.command.user,
+                                                      password=self.command.password,
+                                                      allowed_mechs=self.command.sasl_mechs)
+            return
+
         scheme = "amqps" if self.command.tls_enabled else self.command.scheme
         connection_url = "{}://{}:{}".format(scheme, self.command.host, self.command.port)
         ssl_domain = None

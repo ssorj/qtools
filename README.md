@@ -62,6 +62,14 @@ is `amqp`, and the default host and port are `localhost:5672`.
 
     [SCHEME:][//HOST[:PORT]/]ADDRESS
 
+If a URL omits the scheme, host, and port (for example, `queue1`), the
+messaging tools use an AMQP `connect.json` file when one is available.
+They look at `$MESSAGING_CONNECT_FILE`, `./connect.json`,
+`~/.config/messaging/connect.json`, and `/etc/messaging/connect.json`,
+in that order.  The file can supply the scheme, host, port, TLS
+certificates, and credentials.  Without a configuration file, the
+defaults above apply.
+
 The send and request commands take message content from the optional
 `MESSAGE` arguments (one message per argument), from standard input
 (one message per line), or from a file (one message per line).
@@ -102,6 +110,10 @@ Typical usage:
     $ qconnect --tls
 
     $ qconnect --user alice --password secret amqps://example.net
+
+If you omit the URL, qconnect also uses a connect configuration file
+when one is available.  Without a URL or configuration file, it
+connects to `amqp://localhost:5672`.
 
 ### The qsend and qreceive commands
 

@@ -44,13 +44,18 @@ class ConnectCommand(MessagingCommand):
         self.parser.description = _description
         self.parser.epilog = _epilog
 
-        self.parser.add_argument("url", metavar="URL", nargs="?", default="amqp://localhost",
+        self.parser.add_argument("url", metavar="URL", nargs="?", default=None,
                                  help="The location of an AMQP server (default amqp://localhost:5672)")
 
     def init(self, args):
         super().init(args)
 
-        if "//" in args.url:
+        if args.url is None:
+            self.connect_config_path = connect_config_path()
+
+            if self.connect_config_path is None:
+                self.scheme, self.host, self.port = "amqp", "localhost", 5672
+        elif "//" in args.url:
             self.scheme, self.host, self.port, _ = self.parse_url(args.url)
         else:
             self.scheme, self.host, self.port = "amqp", "localhost", 5672
