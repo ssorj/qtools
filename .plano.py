@@ -21,9 +21,6 @@ from plano import *
 
 @command
 def build():
-    check_module("build")
-    check_module("wheel")
-
     remove("src/qtools/plano")
     copy("subrepos/plano/src/plano", "src/qtools/plano")
 
@@ -32,7 +29,6 @@ def build():
 @command
 def test():
     check_program("pip")
-    check_module("venv")
 
     build()
 
