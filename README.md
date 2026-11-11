@@ -48,6 +48,28 @@ $ qmessage --rate 1 | qrequest requests
 pip install --index-url https://test.pypi.org/simple/ ssorj-qtools
 ~~~
 
+## Development
+
+Install the package and the development dependencies in editable mode:
+
+~~~ shell
+$ pip install --editable ".[dev]"
+~~~
+
+The tests run the installed command-line tools, so install the package
+before running them:
+
+~~~ shell
+$ python -m pytest
+~~~
+
+To build the package and install it from the wheel:
+
+~~~ shell
+$ make build
+$ make install
+~~~
+
 ## Command-line interface
 
 ### Common arguments

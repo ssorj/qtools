@@ -1,6 +1,7 @@
-src/qtools/plano/
 build/
 dist/
 MANIFEST
 *.egg-info
 __pycache__/
+.pytest_cache/
+.venv/

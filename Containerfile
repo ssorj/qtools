@@ -27,7 +27,8 @@ COPY --chown=fritz:fritz . /home/fritz/repo
 USER fritz
 WORKDIR /home/fritz/repo
 
-RUN python plano install
+RUN python -m build
+RUN python -m pip install --user dist/ssorj_qtools-*.whl pytest
 
 FROM python:alpine AS run
 
@@ -35,7 +36,10 @@ RUN apk add --update --no-cache openssl
 
 RUN addgroup -S fritz && adduser -S fritz -G fritz
 COPY --chown=fritz:fritz --from=build /home/fritz/.local /home/fritz/.local
+COPY --chown=fritz:fritz --from=build /home/fritz/repo/tests /home/fritz/tests
+COPY --chown=fritz:fritz --from=build /home/fritz/repo/pyproject.toml /home/fritz/pyproject.toml
 USER fritz
 ENV PATH="/home/fritz/.local/bin:$PATH"
+WORKDIR /home/fritz
 
-CMD ["/home/fritz/.local/bin/qtools-self-test"]
+CMD ["python", "-m", "pytest"]

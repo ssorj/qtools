@@ -27,7 +27,7 @@ requires-python = ">=3.9"
 dependencies = [ "python-qpid-proton" ]
 
 [project.optional-dependencies]
-dev = [ "build", "twine" ]
+dev = [ "build", "pytest", "twine" ]
 
 [project.scripts]
 qconnect = "qtools.connect:main"
@@ -37,7 +37,6 @@ qrequest = "qtools.request:main"
 qrespond = "qtools.respond:main"
 qmessage = "qtools.message:main"
 qbroker = "qtools.brokerlib:main"
-qtools-self-test = "qtools.tests:main"
 
 [project.urls]
 "Homepage" = "https://github.com/ssorj/qtools"
@@ -45,6 +44,12 @@ qtools-self-test = "qtools.tests:main"
 "Source" = "https://github.com/ssorj/qtools"
 "Bug Tracker" = "https://github.com/ssorj/qtools/issues"
 "Changelog" = "https://github.com/ssorj/qtools/commits/main"
+
+[tool.pytest.ini_options]
+testpaths = [ "tests" ]
+markers = [
+  "tls: Tests that require TLS support",
+]
 
 [tool.setuptools]
 package-dir = { "" = "src" }
