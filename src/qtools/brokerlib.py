@@ -148,7 +148,7 @@ class Broker:
             self.fail(e)
         finally:
             if self._config_dir and _os.path.exists(self._config_dir):
-                _shutil.rmtree(self.dir, ignore_errors=True)
+                _shutil.rmtree(self._config_dir, ignore_errors=True)
 
     def _get_node(self, address):
         try:
@@ -540,6 +540,7 @@ def main():
                      init_only=args.init_only)
 
     try:
+        broker.init()
         broker.run()
     except KeyboardInterrupt:
         pass

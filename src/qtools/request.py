@@ -165,7 +165,7 @@ class _Handler(MessagingHandler):
             data = convert_message_to_data(event.message)
             line = _json.dumps(data)
         else:
-            line = event.message.body
+            line = str(event.message.body)
 
         self.command.output_thread.push_line(line)
 

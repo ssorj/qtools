@@ -77,6 +77,8 @@ class MessageCommand(Command):
         self.output_file = _sys.stdout
 
     def init(self, args):
+        super().init(args)
+
         self.max_count = args.count
         self.rate = args.rate
 
