@@ -17,6 +17,7 @@
 # under the License.
 #
 
+from qtools import brokerlib as _brokerlib
 from qtools.brokerlib import _Topic
 
 class _NullBroker:
@@ -108,3 +109,27 @@ def test_topic_removing_last_consumer_discards_messages():
 
     assert list(topic.messages) == []
     assert not topic.consumer_offsets
+
+def test_sasl_config_avoids_shell_interpolation(monkeypatch, tmp_path):
+    broker = object.__new__(_brokerlib.Broker)
+    broker.password = "pa'ss; touch /tmp/pwned"
+    broker.user = "user; touch /tmp/pwned"
+
+    monkeypatch.setattr(_brokerlib._tempfile, "mkdtemp", lambda **kwargs: str(tmp_path))
+    monkeypatch.setenv("PN_SASL_CONFIG_PATH", "")
+
+    calls = []
+
+    def run(command, **kwargs):
+        calls.append((command, kwargs))
+
+    monkeypatch.setattr(_brokerlib._subprocess, "run", run)
+
+    broker._init_sasl_config()
+
+    assert len(calls) == 1
+    command, kwargs = calls[0]
+
+    assert command == ("saslpasswd2", "-p", "-f", str(tmp_path / "users.sasldb"),
+                       broker.user)
+    assert kwargs == {"input": broker.password.encode(), "check": True}

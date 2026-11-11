@@ -100,11 +100,10 @@ class Broker:
             f.write("sasldb_path: {0}\n".format(sasldb_file))
             f.write("mech_list: PLAIN SCRAM-SHA-1\n")
 
-        command = "echo '{0}' | saslpasswd2 -p -f {1} '{2}'".format \
-                  (self.password, sasldb_file, self.user)
+        command = ("saslpasswd2", "-p", "-f", sasldb_file, self.user)
 
         try:
-            _subprocess.check_call(command, shell=True)
+            _subprocess.run(command, input=self.password.encode(), check=True)
         except _subprocess.CalledProcessError as e:
             self.fail("Failed adding user to SASL database: {0}", e)
 
