@@ -63,13 +63,15 @@ class RequestCommand(MessagingCommand):
 
         self.json_enabled = args.json
 
-        if args.input is not None:
+        self.use_input_thread = not (args.message or args.message_compat)
+
+        if self.use_input_thread and args.input is not None:
             self.input_file = open(args.input, "r")
 
         if args.output is not None:
             self.output_file = open(args.output, "w")
 
-        if args.message or args.message_compat:
+        if not self.use_input_thread:
             for value in args.message:
                 self.input_thread.push_line(value)
 
@@ -79,7 +81,9 @@ class RequestCommand(MessagingCommand):
             self.input_thread.push_line("")
 
     def run(self):
-        self.input_thread.start()
+        if self.use_input_thread:
+            self.input_thread.start()
+
         self.output_thread.start()
 
         try:
@@ -130,7 +134,7 @@ class _Handler(MessagingHandler):
             return
 
         try:
-            line = self.command.input_thread.lines.pop()
+            line = self.command.input_thread.pop_line()
         except IndexError:
             return
 

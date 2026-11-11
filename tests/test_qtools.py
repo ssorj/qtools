@@ -284,6 +284,31 @@ def test_qsend_and_qreceive():
         run_qsend_and_qreceive(server.url, ("--count", "10"), (), ("--count", "10"))
         run_qsend_and_qreceive(server.url, ("--count", "10", "--rate", "1000"), (), ("--count", "10"))
 
+def test_qsend_direct_messages_ignore_stdin():
+    with BrokerServer() as server:
+        with tempfile.TemporaryFile("w+") as stdin:
+            stdin.write("from stdin\n")
+            stdin.flush()
+            stdin.seek(0)
+
+            with tempfile.TemporaryDirectory(prefix="qtools-") as temp_dir:
+                output = Path(temp_dir, "output")
+
+                with open(output, "w") as out:
+                    receive_proc = start_qreceive(server.url, ("--count", "1"), stdout=out)
+                    send_proc = start_qsend(server.url, ("hello",), stdin=stdin)
+
+                    try:
+                        wait(send_proc)
+                        wait(receive_proc)
+                    except BaseException:
+                        stop(send_proc)
+                        stop(receive_proc)
+                        raise
+
+                assert output.read_text() == "hello\n"
+                assert stdin.tell() == 0
+
 def test_qrequest_and_qrespond():
     with BrokerServer() as server:
         result = run_qrequest_and_qrespond(server.url, ("--body", "abc123"), (),
@@ -295,6 +320,31 @@ def test_qrequest_and_qrespond():
                                   qrespond_args=("--count", "2"))
         run_qrequest_and_qrespond(server.url, ("--count", "10"), (), ("--count", "10"))
         run_qrequest_and_qrespond(server.url, ("--count", "10", "--rate", "1000"), (), ("--count", "10"))
+
+def test_qrequest_direct_messages_ignore_stdin():
+    with BrokerServer() as server:
+        with tempfile.TemporaryFile("w+") as stdin:
+            stdin.write("from stdin\n")
+            stdin.flush()
+            stdin.seek(0)
+
+            with tempfile.TemporaryDirectory(prefix="qtools-") as temp_dir:
+                output = Path(temp_dir, "output")
+
+                with open(output, "w") as out:
+                    respond_proc = start_qrespond(server.url, ("--count", "1"), stdout=subprocess.DEVNULL)
+                    request_proc = start_qrequest(server.url, ("hello",), stdin=stdin, stdout=out)
+
+                    try:
+                        wait(request_proc)
+                        wait(respond_proc)
+                    except BaseException:
+                        stop(request_proc)
+                        stop(respond_proc)
+                        raise
+
+                assert output.read_text() == "hello\n"
+                assert stdin.tell() == 0
 
 def test_qmessage():
     with BrokerServer() as server:

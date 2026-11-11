@@ -390,6 +390,10 @@ class _InputOutputThread(_threading.Thread):
             self.lines.appendleft(line)
             self.lines_cv.notify()
 
+    def pop_line(self):
+        with self.lines_cv:
+            return self.lines.pop()
+
 class _InputThread(_InputOutputThread):
     def __init__(self, command):
         super().__init__(command)
