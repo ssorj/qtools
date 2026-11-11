@@ -219,10 +219,9 @@ def test_qconnect():
     with BrokerServer() as server:
         run(["qconnect", "--verbose", server.url])
 
-    # A failed connection should terminate instead of hanging.  (It
-    # currently exits with status 0, so the exit code is not checked
-    # here.)
-    run(["qconnect", "--verbose", "no-such-host"], check=False, timeout=20)
+    # A failed connection should terminate with a non-zero exit code.
+    proc = run(["qconnect", "--verbose", "no-such-host"], check=False, timeout=20)
+    assert proc.returncode != 0
 
 @pytest.mark.tls
 def test_connect_config(tmp_path, monkeypatch):

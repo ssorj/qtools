@@ -61,6 +61,7 @@ Messages:
 class Command:
     def __init__(self, name):
         self.name = name
+        self.id = name
 
         try:
             from importlib.metadata import version
@@ -90,6 +91,7 @@ class Command:
         self.verbose = False
         self.debug_enabled = False
         self.init_only = False
+        self.exit_code = 0
 
     def log(self, message, *args):
         summarized_args = [_summarize(x) for x in args]
@@ -129,6 +131,9 @@ class Command:
                 return
 
             self.run()
+
+            if self.exit_code != 0:
+                _sys.exit(self.exit_code)
         except KeyboardInterrupt:
             pass
         except CommandError as e:
@@ -368,6 +373,7 @@ class MessagingHandler(_handlers.MessagingHandler):
     def on_transport_error(self, event):
         cond = event.transport.condition
         self.command.error("{}: {}", cond.name, cond.description)
+        self.command.exit_code = 1
 
 class _InputOutputThread(_threading.Thread):
     def __init__(self, command):
@@ -478,6 +484,8 @@ def _summarize_message(message):
     if isinstance(desc, _proton.Described):
         desc = desc.value
 
+    desc = str(desc)
+
     if len(desc) > 16:
         desc = "{}...".format(desc[:12])
 
@@ -500,7 +508,7 @@ def convert_data_to_message(data):
 
     _set_message_attribute(message, "id", data, "id")
     _set_message_attribute(message, "correlation_id", data, "correlation_id")
-    _set_message_attribute(message, "user", data, "user")
+    _set_message_attribute(message, "user_id", data, "user")
     _set_message_attribute(message, "address", data, "to")
     _set_message_attribute(message, "reply_to", data, "reply_to")
     _set_message_attribute(message, "durable", data, "durable")
@@ -523,6 +531,10 @@ def _set_message_attribute(message, mname, data, dname):
         value = data[dname]
     except KeyError:
         return
+
+    # The AMQP user ID is binary; JSON values are strings
+    if mname == "user_id" and isinstance(value, str):
+        value = value.encode()
 
     setattr(message, mname, value)
 
